@@ -2,7 +2,7 @@
 
 **AWRadioFramework** is an event-driven custom radio framework for **Cyberpunk 2077**. It allows Audioware-powered station packs to appear and behave inside the game's native Radioport and vehicle-radio interfaces.
 
-Current framework version: **v0.7**
+Current framework version: **v 0.7**
 
 ## What the framework provides
 
@@ -18,8 +18,6 @@ Current framework version: **v0.7**
 - Shared Audioware volume synchronized with both Radioport and vehicle-radio volume settings.
 - Seamless mount and unmount transfer without starting a second native station.
 - Isolation between native radio stations and custom Audioware stations.
-
-The framework uses **Redscript, Codeware, TweakXL, and Audioware**. It does not require CET or Lua, and it does not use polling or `OnUpdate` loops.
 
 ## Requirements
 
@@ -97,8 +95,8 @@ Station packs are separate from the framework and normally contain:
 ```text
 r6\audioware\YourStation\audios.yml
 r6\audioware\YourStation\tracks\...
-r6\scripts\YourStation\YourStation.reds
-r6\tweaks\YourStation\YourStation.yaml
+r6\scripts\AWRadioFramework\Radios\YourStation\YourStation.reds
+r6\tweaks\AWRadioFramework\YourStation\YourStation.yaml
 archive\pc\mod\YourStation.archive       optional custom icon
 ```
 
@@ -120,7 +118,7 @@ Important station-author rules:
 
 AWRadioFramework is designed to coexist with the game's native stations and with multiple independently registered AWRadioFramework station packs.
 
-Mods that replace the same Radioport, vehicle-radio, station-list, or radio-event methods may require compatibility work. When diagnosing an issue, test with the DEVELOPMENT build and provide the relevant Redscript and Audioware logs.
+Mods that replace the same Radioport, vehicle-radio, station-list, or radio-event methods may require compatibility work.
 
 ## Troubleshooting
 
