@@ -131,36 +131,12 @@ Mods that replace the same Radioport, vehicle-radio, station-list, or radio-even
 - Confirm that all required dependencies load successfully.
 - Perform a full game restart after changing Redscript, TweakXL, or Audioware files.
 
-### The station appears at the bottom
-
-Confirm that the visible station name begins with a valid numeric value followed by a space, for example:
-
-```text
-98.9 NIGHT CITY DNB
-```
-
-Do not replace the internal integer station index with the decimal frequency.
-
 ### The station appears but produces no audio
 
 - Confirm that Audioware loaded successfully.
 - Confirm that `audios.yml` points to the correct audio files.
 - Confirm that the Audioware event names exactly match the event names registered in the station's Redscript file.
 - Confirm that the audio files use an Audioware-supported format and are not DRM-protected.
-
-### Redscript compilation fails
-
-Use the DEVELOPMENT package and inspect the first reported compiler error. Later errors are often consequences of the first unresolved type, function, or syntax error.
-
-## Uninstallation
-
-Remove:
-
-```text
-Cyberpunk 2077\r6\scripts\AWRadioFramework\
-```
-
-Station packs are separate mods. Remove each station pack's own Redscript, TweakXL, Audioware, audio, and optional archive files separately.
 
 ## Licence
 
