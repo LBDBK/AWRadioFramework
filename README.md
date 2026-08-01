@@ -46,31 +46,6 @@ AWRadioFramework itself does not contain music in the end-user release. At least
 4. Install one or more compatible AWRadioFramework station packs.
 5. Start the game with a full restart so Redscript, TweakXL, and Audioware can load the new files.
 
-Do not install the RELEASE and DEVELOPMENT framework packages together. They use the same runtime paths and are alternative builds of the same version.
-
-## Release and development packages
-
-### RELEASE
-
-The release package is intended for normal players and mod distribution. It contains only the clean runtime framework:
-
-- No bundled test station.
-- No probe files.
-- No development comments.
-- No AWRadioFramework diagnostic logging.
-
-### DEVELOPMENT
-
-The development package is intended for framework testing and troubleshooting. It retains:
-
-- Diagnostic logging.
-- Build marker.
-- Signature-probe reference files.
-- Test station and test assets.
-- Station creator documentation and templates.
-
-Use the DEVELOPMENT build when reporting or investigating framework behaviour. Use the RELEASE build for normal distribution.
-
 ## Using the radio
 
 A correctly installed custom station appears in the native Radioport list and in the mounted vehicle-radio flow.
