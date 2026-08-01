@@ -576,21 +576,6 @@ station.AddTrack(
 );
 ```
 
-Put track blocks in the order you want them to play.
-
-The framework plays:
-
-```text
-Track 1
-Track 2
-Track 3
-...
-Last track
-Track 1 again
-```
-
-There is currently no shuffle mode.
-
 ## Provider names
 
 The template contains:
