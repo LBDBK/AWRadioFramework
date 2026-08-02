@@ -26,51 +26,6 @@ public class AWRadioTrackEndCallback extends DelayCallback {
   }
 }
 
-public class AWRadioVolumeFadeCallback extends DelayCallback {
-  private let m_service: wref<AWRadioService>;
-  private let m_generation: Int32;
-  private let m_step: Int32;
-  private let m_steps: Int32;
-  private let m_startVolume: Float;
-  private let m_targetVolume: Float;
-  private let m_source: CName;
-
-  public static func Create(
-    service: wref<AWRadioService>,
-    generation: Int32,
-    step: Int32,
-    steps: Int32,
-    startVolume: Float,
-    targetVolume: Float,
-    source: CName
-  ) -> ref<AWRadioVolumeFadeCallback> {
-    let callback = new AWRadioVolumeFadeCallback();
-
-    callback.m_service = service;
-    callback.m_generation = generation;
-    callback.m_step = step;
-    callback.m_steps = steps;
-    callback.m_startVolume = startVolume;
-    callback.m_targetVolume = targetVolume;
-    callback.m_source = source;
-
-    return callback;
-  }
-
-  public func Call() -> Void {
-    if IsDefined(this.m_service) {
-      this.m_service.ApplySafeVolumeFadeStep(
-        this.m_generation,
-        this.m_step,
-        this.m_steps,
-        this.m_startVolume,
-        this.m_targetVolume,
-        this.m_source
-      );
-    }
-  }
-}
-
 public class AWRadioService extends ScriptableService {
   private let m_callbackSystem: wref<CallbackSystem>;
   private let m_player: wref<PlayerPuppet>;
@@ -97,14 +52,7 @@ public class AWRadioService extends ScriptableService {
   private let m_conversationSceneTierRestricted: Bool;
   private let m_conversationReleasePending: Bool;
   private let m_conversationMuted: Bool;
-  private let m_audioCombatMixActive: Bool;
-  private let m_preventionHeatStage: Int32;
-  private let m_preventionCombatMusicLatched: Bool;
-  private let m_combatMusicSuppressed: Bool;
-  private let m_volumeFadeGeneration: Int32;
-  private let m_outputVolume: Float;
-  // Radioport and vehicle controls both update this one shared value.
-  // Mounting changes UI context only; it must not change custom-radio volume.
+
   private let m_sharedRadioVolume: Float = 1.0;
 
   public static func Get() -> ref<AWRadioService> {
@@ -128,7 +76,6 @@ public class AWRadioService extends ScriptableService {
       n"OnSessionBeforeEnd"
     );
 
-    FTLog("[AWRadioFramework] service loaded");
   }
 
   private cb func OnSessionReady(event: ref<GameSessionEvent>) -> Void {
@@ -136,31 +83,22 @@ public class AWRadioService extends ScriptableService {
     this.m_sessionReady = IsDefined(this.m_player);
 
     this.ResetConversationState();
-    this.ResetCombatState();
     this.ResetPlaybackState();
     this.ResetTrackControlState();
     this.SyncVolumeSettings();
 
-    FTLog("[AWRadioFramework] session ready");
   }
 
   private cb func OnSessionBeforeEnd(event: ref<GameSessionEvent>) -> Void {
     this.Stop();
     this.ResetConversationState();
-    this.ResetCombatState();
     this.ResetTrackControlState();
 
     this.m_sessionReady = false;
     this.m_player = null;
 
-    FTLog("[AWRadioFramework] session ending");
   }
 
-  // Public station-pack API.
-  //
-  // Station packs call this from their own Codeware ScriptableService during
-  // OnInitialize. Registration is global for the game launch and is not tied
-  // to a save/session.
   public func RegisterStation(
     station: ref<AWRadioStationDefinition>
   ) -> Bool {
@@ -171,7 +109,7 @@ public class AWRadioService extends ScriptableService {
     }
 
     if station.index < 0 || Equals(ArraySize(station.tracks), 0) {
-      FTLog("[AWRadioFramework] rejected incomplete station");
+
       return false;
     }
 
@@ -182,18 +120,16 @@ public class AWRadioService extends ScriptableService {
         return true;
       }
 
-      FTLog(s"[AWRadioFramework] duplicate station index \(station.index)");
       return false;
     }
 
     if IsDefined(this.FindStationByRecord(station.recordID)) {
-      FTLog(s"[AWRadioFramework] duplicate station record \(station.recordID)");
+
       return false;
     }
 
     ArrayPush(this.m_stations, station);
 
-    FTLog(s"[AWRadioFramework] registered station index \(station.index)");
     return true;
   }
 
@@ -243,10 +179,6 @@ public class AWRadioService extends ScriptableService {
     return IsDefined(this.FindStationByIndex(index));
   }
 
-  // Called by the vanilla radio-event integration.
-  //
-  // Returns true when the event belongs to this framework and must not be
-  // passed to the native receiver.
   public func HandleRadioEvent(
     toggle: Bool,
     setStation: Bool,
@@ -281,12 +213,8 @@ public class AWRadioService extends ScriptableService {
     return true;
   }
 
-  // Called before a normal/vanilla station event is allowed through.
   public func ReleaseForNativeRadio() -> Void {
     if IsDefined(this.m_activeStation) {
-      FTLog(
-        "[AWRadioFramework] releasing custom station for native radio"
-      );
 
       this.Stop();
     }
@@ -309,7 +237,6 @@ public class AWRadioService extends ScriptableService {
 
     return "";
   }
-
 
   public func HasActivePlayback() -> Bool {
     return IsDefined(this.m_activeStation)
@@ -338,10 +265,6 @@ public class AWRadioService extends ScriptableService {
 
     this.m_repeatCurrentTrack = !this.m_repeatCurrentTrack;
 
-    FTLog(
-      s"[AWRadioFramework] repeat-current-track=\(this.m_repeatCurrentTrack) source=\(source)"
-    );
-
     return true;
   }
 
@@ -358,10 +281,6 @@ public class AWRadioService extends ScriptableService {
     if !this.AdvanceToNextTrack(source) {
       return false;
     }
-
-    FTLog(
-      s"[AWRadioFramework] skipped to track \(this.GetCurrentTrackTitle()) source=\(source)"
-    );
 
     return true;
   }
@@ -384,11 +303,7 @@ public class AWRadioService extends ScriptableService {
       this.m_conversationReleasePending = true;
     }
 
-    FTLog(
-      s"[AWRadioFramework] conversation PhoneCall restriction=\(restricted)"
-    );
-
-    this.RefreshConversationMute(n"conversation-phone-call");
+    this.RefreshConversationMute();
   }
 
   public func SetSceneTierConversationRestricted(
@@ -409,11 +324,7 @@ public class AWRadioService extends ScriptableService {
       this.m_conversationReleasePending = true;
     }
 
-    FTLog(
-      s"[AWRadioFramework] conversation SceneTier restriction=\(restricted)"
-    );
-
-    this.RefreshConversationMute(n"conversation-scene-tier");
+    this.RefreshConversationMute();
   }
 
   public func SyncConversationNativeAvailability(
@@ -423,10 +334,6 @@ public class AWRadioService extends ScriptableService {
       return;
     }
 
-    FTLog(
-      s"[AWRadioFramework] conversation native availability restricted=\(nativeRestricted)"
-    );
-
     if nativeRestricted
       || this.m_conversationPhoneCallRestricted
       || this.m_conversationSceneTierRestricted {
@@ -434,189 +341,14 @@ public class AWRadioService extends ScriptableService {
     }
 
     this.m_conversationReleasePending = false;
-    this.RefreshConversationMute(n"conversation-native-unlock");
+    this.RefreshConversationMute();
   }
 
   public func IsConversationMuted() -> Bool {
     return this.m_conversationMuted;
   }
 
-  // The audio system owns the ordinary combat mix transition. Prevention
-  // encounters are special: the combat mix can toggle at one or two stars
-  // while vanilla radio keeps playing. For those encounters, suppression is
-  // latched only when the prevention heat reaches stage 3, then held until
-  // the heat fully returns to zero.
-  public func SetAudioCombatMixActive(
-    active: Bool,
-    source: CName
-  ) -> Void {
-    if Equals(this.m_audioCombatMixActive, active) {
-      return;
-    }
-
-    this.m_audioCombatMixActive = active;
-    this.RefreshCombatMusicSuppression(source);
-
-    FTLog(
-      s"[AWRadioFramework] combat audio mix active=\(active) heat=\(this.m_preventionHeatStage) source=\(source)"
-    );
-  }
-
-  public func SetPreventionHeatStage(
-    stage: Int32,
-    source: CName
-  ) -> Void {
-    if Equals(this.m_preventionHeatStage, stage) {
-      return;
-    }
-
-    this.m_preventionHeatStage = stage;
-
-    if stage >= 3 {
-      this.m_preventionCombatMusicLatched = true;
-    } else {
-      if Equals(stage, 0) {
-        this.m_preventionCombatMusicLatched = false;
-
-        // Prevention can leave the scripted combat-mix flag stale while its
-        // own music unwinds. Heat zero is the authoritative end of that
-        // encounter, so do not let the stale flag keep custom radio muted.
-        this.m_audioCombatMixActive = false;
-      }
-    }
-
-    this.RefreshCombatMusicSuppression(source);
-
-    FTLog(
-      s"[AWRadioFramework] prevention heat stage=\(stage) combat-music-latched=\(this.m_preventionCombatMusicLatched) source=\(source)"
-    );
-  }
-
-  public func IsCombatMusicSuppressed() -> Bool {
-    return this.m_combatMusicSuppressed;
-  }
-
-  private func RefreshCombatMusicSuppression(
-    source: CName
-  ) -> Void {
-    let shouldSuppress = this.m_preventionCombatMusicLatched
-      || (Equals(this.m_preventionHeatStage, 0)
-        && this.m_audioCombatMixActive);
-
-    if Equals(
-      this.m_combatMusicSuppressed,
-      shouldSuppress
-    ) {
-      return;
-    }
-
-    this.m_combatMusicSuppressed = shouldSuppress;
-    this.StartSafeVolumeFade(source, 5.0);
-
-    FTLog(
-      s"[AWRadioFramework] combat music suppression active=\(shouldSuppress) source=\(source) fade=5.000000s"
-    );
-  }
-
-  private func StartSafeVolumeFade(
-    source: CName,
-    duration: Float
-  ) -> Void {
-    let callback: ref<AWRadioVolumeFadeCallback>;
-    let delay: Float;
-    let step: Int32;
-    let steps: Int32 = 20;
-    let startVolume: Float;
-    let targetVolume: Float;
-
-    if !IsDefined(this.m_currentSound)
-      || !IsDefined(this.m_activeStation) {
-      return;
-    }
-
-    startVolume = ClampF(this.m_outputVolume, 0.0, 2.0);
-    targetVolume = this.GetTargetVolume();
-
-    if AbsF(targetVolume - startVolume) < 0.001 {
-      return;
-    }
-
-    this.m_volumeFadeGeneration += 1;
-    step = 1;
-
-    while step <= steps {
-      callback = AWRadioVolumeFadeCallback.Create(
-        this,
-        this.m_volumeFadeGeneration,
-        step,
-        steps,
-        startVolume,
-        targetVolume,
-        source
-      );
-
-      delay = MaxF(duration, 0.0)
-        * Cast<Float>(step)
-        / Cast<Float>(steps);
-
-      GameInstance
-        .GetDelaySystem(GetGameInstance())
-        .DelayCallback(callback, delay, false);
-
-      step += 1;
-    }
-
-    FTLog(
-      s"[AWRadioFramework] scheduled safe volume fade source=\(source) start=\(startVolume) target=\(targetVolume) duration=\(duration)s generation=\(this.m_volumeFadeGeneration)"
-    );
-  }
-
-  public func ApplySafeVolumeFadeStep(
-    generation: Int32,
-    step: Int32,
-    steps: Int32,
-    startVolume: Float,
-    targetVolume: Float,
-    source: CName
-  ) -> Void {
-    let fraction: Float;
-    let volume: Float;
-
-    if NotEquals(generation, this.m_volumeFadeGeneration)
-      || !IsDefined(this.m_currentSound)
-      || steps <= 0 {
-      return;
-    }
-
-    fraction = ClampF(
-      Cast<Float>(step) / Cast<Float>(steps),
-      0.0,
-      1.0
-    );
-
-    volume = ClampF(
-      startVolume + (targetVolume - startVolume) * fraction,
-      0.0,
-      2.0
-    );
-
-    this.m_currentSound.SetVolume(
-      volume,
-      LinearTween.Immediate(0.05)
-    );
-
-    this.m_outputVolume = volume;
-
-    if Equals(step, steps) {
-      FTLog(
-        s"[AWRadioFramework] completed safe volume fade source=\(source) volume=\(volume) generation=\(generation)"
-      );
-    }
-  }
-
-  private func RefreshConversationMute(
-    source: CName
-  ) -> Void {
+  private func RefreshConversationMute() -> Void {
     let shouldMute =
       this.m_conversationPhoneCallRestricted
       || this.m_conversationSceneTierRestricted
@@ -627,25 +359,9 @@ public class AWRadioService extends ScriptableService {
     }
 
     this.m_conversationMuted = shouldMute;
-    this.ApplyActiveVolume(source);
-
-    if shouldMute {
-      FTLog(
-        s"[AWRadioFramework] conversation mute engaged source=\(source)"
-      );
-    } else {
-      FTLog(
-        s"[AWRadioFramework] conversation mute released source=\(source)"
-      );
-    }
+    this.ApplyActiveVolume();
   }
 
-  // Loading-screen audio suppression must not query Audioware Position() while
-  // the map has disconnected the dynamic-event command channel. The framework
-  // already owns an accurate simulation-time playback clock, which naturally
-  // stops while menus suppress the radio. Capture that logical position, mute
-  // the retained event, then seek while still silent after loading. A second
-  // one-shot callback restores volume only after the seek has had time to land.
   public func MuteForLoadingScreen() -> Bool {
     let elapsed: Float;
     let track = this.GetCurrentTrack();
@@ -667,25 +383,16 @@ public class AWRadioService extends ScriptableService {
       track.duration
     );
 
-    // Invalidate the existing track-end callback while the retained event is
-    // silent underneath the loading presentation.
     this.m_generation += 1;
-
-    this.m_volumeFadeGeneration += 1;
 
     this.m_currentSound.SetVolume(
       0.0,
       LinearTween.Immediate(0.05)
     );
 
-    this.m_outputVolume = 0.0;
     this.m_loadingScreenMuted = true;
     this.m_loadingScreenSeekPrepared = false;
     this.m_loadingScreenGeneration = this.m_generation;
-
-    FTLog(
-      s"[AWRadioFramework] loading mute armed event=\(this.m_currentEvent) simulated-position=\(this.m_loadingScreenPosition)s generation=\(this.m_loadingScreenGeneration)"
-    );
 
     return true;
   }
@@ -708,18 +415,12 @@ public class AWRadioService extends ScriptableService {
       return false;
     }
 
-    // Keep the event at volume zero while the asynchronous seek command is
-    // delivered. Volume restoration happens in a separate one-shot callback.
     this.m_currentSound.SeekTo(
       position,
       LinearTween.Immediate(0.0)
     );
 
     this.m_loadingScreenSeekPrepared = true;
-
-    FTLog(
-      s"[AWRadioFramework] prepared silent loading restore event=\(this.m_currentEvent) position=\(position)s"
-    );
 
     return true;
   }
@@ -750,8 +451,7 @@ public class AWRadioService extends ScriptableService {
       0.10
     );
 
-    if this.m_conversationMuted
-      || this.m_combatMusicSuppressed {
+    if this.m_conversationMuted {
       effectiveVolume = 0.0;
     } else {
       effectiveVolume = this.GetEffectiveVolume();
@@ -762,7 +462,6 @@ public class AWRadioService extends ScriptableService {
       LinearTween.Immediate(0.05)
     );
 
-    this.m_outputVolume = effectiveVolume;
     this.m_pausedPosition = position;
     this.m_playbackAnchor = position;
     this.m_playbackStartedAt = this.GetPlaybackClock();
@@ -779,10 +478,6 @@ public class AWRadioService extends ScriptableService {
       .DelayCallback(callback, remaining, false);
 
     this.ClearLoadingScreenMuteState();
-
-    FTLog(
-      s"[AWRadioFramework] loading mute released event=\(this.m_currentEvent) restored-position=\(position)s remaining=\(remaining)s effective-volume=\(effectiveVolume)"
-    );
 
     return true;
   }
@@ -827,7 +522,6 @@ public class AWRadioService extends ScriptableService {
       track.duration
     );
 
-    // Invalidate the existing track-end callback.
     this.m_generation += 1;
 
     this.m_currentSound.Pause(
@@ -835,10 +529,6 @@ public class AWRadioService extends ScriptableService {
     );
 
     this.m_isPaused = true;
-
-    FTLog(
-      s"[AWRadioFramework] paused \(this.m_currentEvent) at \(this.m_pausedPosition)s source=\(source)"
-    );
 
     return true;
   }
@@ -880,13 +570,8 @@ public class AWRadioService extends ScriptableService {
       .GetDelaySystem(GetGameInstance())
       .DelayCallback(callback, remaining, false);
 
-    FTLog(
-      s"[AWRadioFramework] resumed \(this.m_currentEvent) at \(this.m_pausedPosition)s remaining=\(remaining)s source=\(source)"
-    );
-
     return true;
   }
-
 
   private func GetPlaybackClock() -> Float {
     return EngineTime.ToFloat(
@@ -895,7 +580,6 @@ public class AWRadioService extends ScriptableService {
       )
     );
   }
-
 
   public func SetRadioportVolume(
     percent: Float
@@ -925,7 +609,7 @@ public class AWRadioService extends ScriptableService {
       1.0
     );
 
-    this.ApplyActiveVolume(source);
+    this.ApplyActiveVolume();
   }
 
   public func GetRadioportVolume() -> Float {
@@ -943,7 +627,7 @@ public class AWRadioService extends ScriptableService {
   public func RefreshActiveVolume(
     source: CName
   ) -> Void {
-    this.ApplyActiveVolume(source);
+    this.ApplyActiveVolume();
   }
 
   private func SyncVolumeSettings() -> Void {
@@ -966,9 +650,6 @@ public class AWRadioService extends ScriptableService {
       return;
     }
 
-    // On session start, use the setting belonging to the player's current
-    // context as the initial shared value. After that, whichever control is
-    // changed last updates the same shared value through the listener.
     if this.IsPlayerMounted() {
       variableName = n"CarRadioVolume";
     } else {
@@ -991,44 +672,24 @@ public class AWRadioService extends ScriptableService {
       1.0
     );
 
-    FTLog(
-      s"[AWRadioFramework] initialized shared radio volume \(variable.GetValue())% from \(variableName)"
-    );
-
-    this.ApplyActiveVolume(
-      n"settings-sync"
-    );
+    this.ApplyActiveVolume();
   }
 
-  private func ApplyActiveVolume(
-    source: CName
-  ) -> Void {
-    this.ApplyActiveVolumeTween(
-      source,
-      0.05
-    );
+  private func ApplyActiveVolume() -> Void {
+    this.ApplyActiveVolumeTween(0.05);
   }
 
   private func ApplyActiveVolumeTween(
-    source: CName,
     duration: Float
   ) -> Void {
     let effectiveVolume: Float;
-    let percent = Cast<Int32>(
-      this.m_sharedRadioVolume * 100.0
-    );
-
     if !IsDefined(this.m_currentSound)
       || !IsDefined(this.m_activeStation) {
-      FTLog(
-        s"[AWRadioFramework] stored shared radio volume \(percent)% source=\(source)"
-      );
 
       return;
     }
 
     effectiveVolume = this.GetTargetVolume();
-    this.m_volumeFadeGeneration += 1;
 
     this.m_currentSound.SetVolume(
       effectiveVolume,
@@ -1037,11 +698,6 @@ public class AWRadioService extends ScriptableService {
       )
     );
 
-    this.m_outputVolume = effectiveVolume;
-
-    FTLog(
-      s"[AWRadioFramework] applied shared radio volume \(percent)% effective=\(effectiveVolume) source=\(source) fade=\(duration)s"
-    );
   }
 
   private func IsPlayerMounted() -> Bool {
@@ -1057,8 +713,7 @@ public class AWRadioService extends ScriptableService {
 
   private func GetTargetVolume() -> Float {
     if this.m_loadingScreenMuted
-      || this.m_conversationMuted
-      || this.m_combatMusicSuppressed {
+      || this.m_conversationMuted {
       return 0.0;
     }
 
@@ -1089,9 +744,6 @@ public class AWRadioService extends ScriptableService {
     }
 
     if this.m_repeatCurrentTrack {
-      FTLog(
-        s"[AWRadioFramework] repeating track \(this.GetCurrentTrackTitle())"
-      );
 
       this.PlayCurrentTrack();
       return;
@@ -1114,9 +766,6 @@ public class AWRadioService extends ScriptableService {
     if this.m_trackOrderPosition >= ArraySize(this.m_trackOrder) {
       this.BuildShuffledTrackOrder(previousTrackIndex);
 
-      FTLog(
-        s"[AWRadioFramework] reshuffled station index \(this.m_activeStation.index) next-track-index=\(this.m_trackIndex) source=\(source)"
-      );
     } else {
       this.m_trackIndex = this.m_trackOrder[
         this.m_trackOrderPosition
@@ -1143,17 +792,9 @@ public class AWRadioService extends ScriptableService {
   ) -> Void {
     this.Stop();
 
-    FTLog(
-      s"[AWRadioFramework] starting station index \(station.index)"
-    );
-
     this.m_activeStation = station;
     this.BuildShuffledTrackOrder(-1);
     this.m_generation += 1;
-
-    FTLog(
-      s"[AWRadioFramework] shuffled station index \(station.index) tracks=\(ArraySize(station.tracks)) first-track-index=\(this.m_trackIndex)"
-    );
 
     this.PlayCurrentTrack();
   }
@@ -1231,17 +872,12 @@ public class AWRadioService extends ScriptableService {
     );
 
     if !IsDefined(sound) {
-      FTLog(
-        s"[AWRadioFramework] failed to create dynamic sound \(track.eventName)"
-      );
 
       return;
     }
 
-    this.m_volumeFadeGeneration += 1;
     this.m_currentSound = sound;
     this.m_currentEvent = track.eventName;
-    this.m_outputVolume = settings.volume;
     this.m_isPaused = false;
     this.m_pausedPosition = 0.0;
     this.m_playbackAnchor = 0.0;
@@ -1260,10 +896,6 @@ public class AWRadioService extends ScriptableService {
       .GetDelaySystem(GetGameInstance())
       .DelayCallback(callback, track.duration, false);
 
-    FTLog(
-      s"[AWRadioFramework] playing dynamic \(track.eventName) volume=\(settings.volume)"
-    );
-
     this.NotifyTrackChanged();
   }
 
@@ -1274,7 +906,6 @@ public class AWRadioService extends ScriptableService {
       .GetUISystem(GetGameInstance())
       .QueueEvent(event);
 
-    FTLog("[AWRadioFramework] queued track UI refresh");
   }
 
   private func GetCurrentTrack() -> ref<AWRadioTrackDefinition> {
@@ -1295,14 +926,9 @@ public class AWRadioService extends ScriptableService {
   }
 
   private func Stop() -> Void {
-    let eventName = this.m_currentEvent;
-
     this.m_generation += 1;
 
     if IsDefined(this.m_currentSound) {
-      FTLog(
-        s"[AWRadioFramework] stopping dynamic Audioware event \(eventName)"
-      );
 
       this.m_currentSound.Stop(
         LinearTween.Immediate(0.05)
@@ -1319,13 +945,6 @@ public class AWRadioService extends ScriptableService {
     this.m_conversationMuted = false;
   }
 
-  private func ResetCombatState() -> Void {
-    this.m_audioCombatMixActive = false;
-    this.m_preventionHeatStage = 0;
-    this.m_preventionCombatMusicLatched = false;
-    this.m_combatMusicSuppressed = false;
-  }
-
   private func ResetTrackControlState() -> Void {
     this.m_repeatCurrentTrack = false;
   }
@@ -1335,10 +954,8 @@ public class AWRadioService extends ScriptableService {
     this.m_trackIndex = 0;
     ArrayClear(this.m_trackOrder);
     this.m_trackOrderPosition = 0;
-    this.m_volumeFadeGeneration += 1;
     this.m_currentEvent = n"";
     this.m_currentSound = null;
-    this.m_outputVolume = 0.0;
     this.m_isPaused = false;
     this.m_pausedPosition = 0.0;
     this.m_playbackAnchor = 0.0;
