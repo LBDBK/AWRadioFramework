@@ -3,7 +3,6 @@ module AWRadioFramework
 import Codeware.*
 
 public class AWRadioTrackControlListener {
-  private let m_notificationFieldsLogged: Bool;
   private let m_player: wref<PlayerPuppet>;
 
   public func Initialize(player: wref<PlayerPuppet>) -> Void {
@@ -17,10 +16,8 @@ public class AWRadioTrackControlListener {
     let eventClass: ref<ReflectionClass>;
     let notificationType: UIInGameNotificationType;
     let notificationTypeProperty: ref<ReflectionProp>;
-    let notificationTypeRTTI: ref<ReflectionType>;
     let owner: Variant;
     let titleProperty: ref<ReflectionProp>;
-    let titleRTTI: ref<ReflectionType>;
 
     if !IsDefined(event) {
       return false;
@@ -30,9 +27,7 @@ public class AWRadioTrackControlListener {
     eventClass = Reflection.GetClassOf(owner, true);
 
     if !IsDefined(eventClass) {
-      FTLog(
-        "[AWRadioFramework] UIInGameNotificationEvent RTTI class unavailable"
-      );
+
       return false;
     }
 
@@ -41,38 +36,15 @@ public class AWRadioTrackControlListener {
     );
 
     if !IsDefined(notificationTypeProperty) {
-      FTLog(
-        "[AWRadioFramework] UIInGameNotificationEvent.notificationType RTTI property missing"
-      );
+
       return false;
     }
 
     titleProperty = eventClass.GetProperty(n"title");
 
     if !IsDefined(titleProperty) {
-      FTLog(
-        "[AWRadioFramework] UIInGameNotificationEvent.title RTTI property missing"
-      );
+
       return false;
-    }
-
-    notificationTypeRTTI = notificationTypeProperty.GetType();
-    titleRTTI = titleProperty.GetType();
-
-    if !this.m_notificationFieldsLogged {
-      this.m_notificationFieldsLogged = true;
-
-      if IsDefined(notificationTypeRTTI) {
-        FTLog(
-          s"[AWRadioFramework] notificationType RTTI type=\(notificationTypeRTTI.GetName())"
-        );
-      }
-
-      if IsDefined(titleRTTI) {
-        FTLog(
-          s"[AWRadioFramework] notification title RTTI type=\(titleRTTI.GetName())"
-        );
-      }
     }
 
     notificationType = UIInGameNotificationType.GenericNotification;
@@ -100,9 +72,7 @@ public class AWRadioTrackControlListener {
     event = new UIInGameNotificationEvent();
 
     if !this.ConfigureGenericNotification(event, message) {
-      FTLog(
-        "[AWRadioFramework] generic track-control notification not queued"
-      );
+
       return;
     }
 
@@ -148,10 +118,6 @@ public class AWRadioTrackControlListener {
         s"SKIP SONG: \(service.GetCurrentTrackTitle())"
       );
 
-      FTLog(
-        s"[AWRadioFramework] input skip accepted track=\(service.GetCurrentTrackTitle())"
-      );
-
       return true;
     }
 
@@ -164,10 +130,6 @@ public class AWRadioTrackControlListener {
     } else {
       this.ShowTrackControlMessage("REPEAT SONG: OFF");
     }
-
-    FTLog(
-      s"[AWRadioFramework] input repeat accepted enabled=\(service.IsRepeatCurrentTrackEnabled())"
-    );
 
     return true;
   }
@@ -198,8 +160,6 @@ protected cb func OnGameAttached() -> Bool {
     listener,
     n"AWRadioToggleRepeatSong"
   );
-
-  FTLog("[AWRadioFramework] track-control input listener registered");
 
   return result;
 }

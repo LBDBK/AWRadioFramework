@@ -4,8 +4,13 @@ module AWRadioFramework
 protected cb func OnInitialize() -> Void {
   let service = AWRadioService.Get();
 
-  if IsDefined(service)
-    && service.MuteForLoadingScreen() {
+  AWRadioMusicDuckBridge.SetLoadingSuspended(
+    true,
+    n"loading-screen-start"
+  );
+
+  if IsDefined(service) {
+    service.MuteForLoadingScreen();
   }
 
   wrappedMethod();

@@ -32,6 +32,11 @@ public func HandleRestriction(
       service.SetSceneTierConversationRestricted(false);
     }
   }
+
+  AWRadioMusicDuckBridge.SetRestrictionSuspended(
+    this.IsRestricted(),
+    n"pocket-radio-restriction"
+  );
 }
 
 @wrapMethod(PocketRadio)
@@ -45,4 +50,9 @@ public func HandleRestrictionStateChanged() -> Void {
       this.IsRestricted()
     );
   }
+
+  AWRadioMusicDuckBridge.SetRestrictionSuspended(
+    this.IsRestricted(),
+    n"pocket-radio-restriction-state"
+  );
 }

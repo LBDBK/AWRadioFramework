@@ -115,12 +115,14 @@ public abstract class AWRadioPopupStateHelper {
     property = controllerClass.GetProperty(propertyName);
 
     if !IsDefined(property) {
+
       return false;
     }
 
     propertyType = property.GetType();
 
     if !IsDefined(propertyType) {
+
       return false;
     }
 
@@ -190,6 +192,7 @@ public abstract class AWRadioPopupStateHelper {
               return true;
             }
           } else {
+
             return false;
           }
         }
@@ -269,6 +272,7 @@ public abstract class AWRadioPopupStateHelper {
     );
 
     if startupIndex >= ArraySize(stations) {
+
       return;
     }
 
@@ -277,6 +281,7 @@ public abstract class AWRadioPopupStateHelper {
     );
 
     if !IsDefined(record) {
+
       return;
     }
 

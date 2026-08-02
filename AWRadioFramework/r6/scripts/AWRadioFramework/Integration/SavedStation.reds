@@ -61,9 +61,6 @@ public class AWRadioSavedStationSystem extends ScriptableSystem {
       n"OnSessionBeforeEnd"
     );
 
-    FTLog(
-      s"[AWRadioFramework] saved-station persistence attached hasCustom=\(this.m_hasCustomStation) index=\(this.m_stationIndex) playing=\(this.m_wasPlaying)"
-    );
   }
 
   private func OnDetach() -> Void {
@@ -73,6 +70,14 @@ public class AWRadioSavedStationSystem extends ScriptableSystem {
   private cb func OnSessionReady(
     event: ref<GameSessionEvent>
   ) -> Void {
+    if !IsDefined(event) || event.IsPreGame() {
+      this.m_sessionReady = false;
+      this.m_restorePending = false;
+      this.m_generation += 1;
+
+      return;
+    }
+
     this.m_sessionReady = true;
     this.m_generation += 1;
     this.m_restorePending = this.m_hasCustomStation
@@ -86,9 +91,6 @@ public class AWRadioSavedStationSystem extends ScriptableSystem {
       );
     }
 
-    FTLog(
-      s"[AWRadioFramework] saved-station session ready hasCustom=\(this.m_hasCustomStation) index=\(this.m_stationIndex) playing=\(this.m_wasPlaying) pending=\(this.m_restorePending)"
-    );
   }
 
   private cb func OnSessionBeforeEnd(
@@ -98,9 +100,6 @@ public class AWRadioSavedStationSystem extends ScriptableSystem {
     this.m_restorePending = false;
     this.m_generation += 1;
 
-    FTLog(
-      s"[AWRadioFramework] saved-station session ending hasCustom=\(this.m_hasCustomStation) index=\(this.m_stationIndex) playing=\(this.m_wasPlaying)"
-    );
   }
 
   public func RecordCustomRadioEvent(
@@ -114,10 +113,6 @@ public class AWRadioSavedStationSystem extends ScriptableSystem {
       this.m_wasPlaying = true;
       this.m_restorePending = false;
       this.m_generation += 1;
-
-      FTLog(
-        s"[AWRadioFramework] saved custom station index=\(stationIndex) playing=true"
-      );
 
       return;
     }
@@ -142,9 +137,6 @@ public class AWRadioSavedStationSystem extends ScriptableSystem {
       this.m_generation += 1;
     }
 
-    FTLog(
-      s"[AWRadioFramework] saved custom playback playing=\(isPlaying) index=\(this.m_stationIndex)"
-    );
   }
 
   public func RecordNativeRadioEvent(
@@ -154,12 +146,6 @@ public class AWRadioSavedStationSystem extends ScriptableSystem {
   ) -> Void {
     if !toggle || !setStation {
       return;
-    }
-
-    if this.m_hasCustomStation {
-      FTLog(
-        s"[AWRadioFramework] cleared saved custom station for native index=\(stationIndex)"
-      );
     }
 
     this.m_hasCustomStation = false;
@@ -212,10 +198,6 @@ public class AWRadioSavedStationSystem extends ScriptableSystem {
       this.m_restorePending = false;
     }
 
-    FTLog(
-      s"[AWRadioFramework] saved custom restore waiting attempt=\(attempt) index=\(this.m_stationIndex) reason=\(reason)"
-    );
-
     return false;
   }
 
@@ -248,10 +230,6 @@ public class AWRadioSavedStationSystem extends ScriptableSystem {
     if !saveCurrentStation.GetValue() {
       this.m_restorePending = false;
 
-      FTLog(
-        s"[AWRadioFramework] saved custom restore skipped setting=false index=\(stationIndex)"
-      );
-
       return false;
     }
 
@@ -274,10 +252,6 @@ public class AWRadioSavedStationSystem extends ScriptableSystem {
       ) {
       this.m_restorePending = false;
       this.m_wasPlaying = true;
-
-      FTLog(
-        s"[AWRadioFramework] saved custom station already active index=\(stationIndex) attempt=\(attempt)"
-      );
 
       return true;
     }
@@ -325,6 +299,11 @@ public class AWRadioSavedStationSystem extends ScriptableSystem {
     this.m_restorePending = false;
     this.m_wasPlaying = true;
 
+    AWRadioMusicDuckBridge.SetRadioPlaying(
+      service.IsPlaybackRunning(),
+      n"saved-station-restore"
+    );
+
     AWRadioPlaybackUIBridge.Sync(service);
 
     if IsDefined(GetMountedVehicle(player)) {
@@ -339,10 +318,6 @@ public class AWRadioSavedStationSystem extends ScriptableSystem {
           n"saved-station-restore-100ms"
         );
     }
-
-    FTLog(
-      s"[AWRadioFramework] restored persisted custom station index=\(stationIndex) attempt=\(attempt) setting=true"
-    );
 
     return true;
   }

@@ -247,13 +247,12 @@ public abstract class AWRadioVehicleTransitionBridge {
     component = vehicle.GetVehicleComponent();
 
     if IsDefined(component) {
-      if !AWRadioVehicleTransitionBridge
+      AWRadioVehicleTransitionBridge
         .SetComponentBoolProperty(
           component,
           n"radioState",
           isPlaying
-        ) {
-      }
+        );
     }
 
     blackboard = vehicle.GetBlackboard();
@@ -359,6 +358,16 @@ protected func OnEnter(
     scriptInterface
   );
 
+  AWRadioMusicDuckBridge.ScheduleMountedRadioRefresh(
+    0.10,
+    n"vehicle-mount-100ms"
+  );
+
+  AWRadioMusicDuckBridge.ScheduleMountedRadioRefresh(
+    0.50,
+    n"vehicle-mount-500ms"
+  );
+
   if IsDefined(service)
     && service.HasActivePlayback() {
     AWRadioVehicleTransitionBridge
@@ -428,6 +437,15 @@ private func HandleVehicleUnmounted(
         n"unmount-100ms"
       );
 
+    AWRadioMusicDuckBridge.SetRadioPlaying(
+      service.IsPlaybackRunning(),
+      n"vehicle-unmount-custom"
+    );
+  } else {
+    AWRadioMusicDuckBridge.SetRadioPlaying(
+      this.IsActive(),
+      n"vehicle-unmount-native"
+    );
   }
 }
 
@@ -438,6 +456,19 @@ private func HandleVehicleRadioEvent(
   let service = AWRadioService.Get();
 
   wrappedMethod(evt);
+
+  if IsDefined(service)
+    && service.HasActivePlayback() {
+    AWRadioMusicDuckBridge.SetRadioPlaying(
+      service.IsPlaybackRunning(),
+      n"vehicle-radio-event-custom"
+    );
+  } else {
+    AWRadioMusicDuckBridge.SetRadioPlaying(
+      evt.toggle,
+      n"vehicle-radio-event-native"
+    );
+  }
 
   if IsDefined(service)
     && service.HasActivePlayback()

@@ -30,6 +30,7 @@ public final func SendRadioEvent(
   station: Int32
 ) -> Void {
   let activeIndex: Int32;
+  let savedStationState = AWRadioSavedStationSystem.Get();
   let selectedRowState = AWRadioSelectedRowService.Get();
   let service = AWRadioService.Get();
   let selectedRecordIndex = -1;
@@ -46,6 +47,13 @@ public final func SendRadioEvent(
 
   if IsDefined(service) {
     if service.IsCustomStation(station) {
+      if IsDefined(savedStationState) {
+        savedStationState.RecordCustomRadioEvent(
+          toggle,
+          setStation,
+          station
+        );
+      }
 
       activeIndex = service.GetActiveStationIndex();
 
@@ -67,14 +75,36 @@ public final func SendRadioEvent(
           selectedRowState.ScheduleRefresh();
         }
 
+        AWRadioMusicDuckBridge.SetRadioPlaying(
+          service.IsPlaybackRunning(),
+          n"quickslots-custom"
+        );
+
         return;
       }
     } else {
+      if IsDefined(savedStationState) {
+        if !toggle && service.HasActivePlayback() {
+          savedStationState.RecordPlaybackState(false);
+        } else {
+          savedStationState.RecordNativeRadioEvent(
+            toggle,
+            setStation,
+            station
+          );
+        }
+      }
+
       service.ReleaseForNativeRadio();
     }
   }
 
   wrappedMethod(toggle, setStation, station);
+
+  AWRadioMusicDuckBridge.SetRadioPlaying(
+    toggle,
+    n"quickslots-native"
+  );
 
   if IsDefined(selectedRowState) {
     selectedRowState.ScheduleRefresh();

@@ -129,7 +129,6 @@ public class AWRadioSelectedRowService extends ScriptableService {
     let controller:
       wref<RadioStationListItemController>;
     let controllerClass: ref<ReflectionClass>;
-    let refreshed = 0;
     let retained:
       array<wref<RadioStationListItemController>>;
     let status: Bool;
@@ -153,6 +152,7 @@ public class AWRadioSelectedRowService extends ScriptableService {
     );
 
     if !IsDefined(updateFunction) {
+
       return;
     }
 
@@ -169,9 +169,6 @@ public class AWRadioSelectedRowService extends ScriptableService {
           status
         );
 
-        if status {
-          refreshed += 1;
-        }
       }
 
       i += 1;

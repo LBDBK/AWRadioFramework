@@ -43,6 +43,7 @@ private func HandleRadioToggleEvent(
   evt: ref<RadioToggleEvent>
 ) -> Void {
   let desiredPaused: Bool;
+  let savedStationState = AWRadioSavedStationSystem.Get();
   let service = AWRadioService.Get();
 
   if IsDefined(service)
@@ -72,10 +73,26 @@ private func HandleRadioToggleEvent(
 
     AWRadioPlaybackUIBridge.Sync(service);
 
+    if IsDefined(savedStationState) {
+      savedStationState.RecordPlaybackState(
+        service.IsPlaybackRunning()
+      );
+    }
+
+    AWRadioMusicDuckBridge.SetRadioPlaying(
+      service.IsPlaybackRunning(),
+      n"on-foot-custom-hotkey"
+    );
+
     return;
   }
 
   wrappedMethod(evt);
+
+  AWRadioMusicDuckBridge.SetRadioPlaying(
+    this.IsActive(),
+    n"on-foot-native-hotkey"
+  );
 }
 
 @wrapMethod(VehicleComponent)
@@ -83,6 +100,7 @@ protected cb func OnRadioToggleEvent(
   evt: ref<RadioToggleEvent>
 ) -> Bool {
   let desiredPaused: Bool;
+  let savedStationState = AWRadioSavedStationSystem.Get();
   let service = AWRadioService.Get();
   let vanillaResult: Bool;
 
@@ -108,6 +126,17 @@ protected cb func OnRadioToggleEvent(
 
     AWRadioPlaybackUIBridge.Sync(service);
 
+    if IsDefined(savedStationState) {
+      savedStationState.RecordPlaybackState(
+        service.IsPlaybackRunning()
+      );
+    }
+
+    AWRadioMusicDuckBridge.SetRadioPlaying(
+      service.IsPlaybackRunning(),
+      n"mounted-custom-hotkey"
+    );
+
     AWRadioVehicleTransitionBridge.SyncMountedState(
       service.IsPlaybackRunning(),
       n"mounted-hotkey"
@@ -122,5 +151,11 @@ protected cb func OnRadioToggleEvent(
     return vanillaResult;
   }
 
-  return wrappedMethod(evt);
+  vanillaResult = wrappedMethod(evt);
+
+  AWRadioMusicDuckBridge.RefreshMountedRadio(
+    n"mounted-native-hotkey"
+  );
+
+  return vanillaResult;
 }

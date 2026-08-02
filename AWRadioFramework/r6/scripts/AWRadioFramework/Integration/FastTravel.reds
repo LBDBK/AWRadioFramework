@@ -4,8 +4,8 @@ public class AWRadioLoadingVolumeRestoreCallback extends DelayCallback {
   public func Call() -> Void {
     let service = AWRadioService.Get();
 
-    if IsDefined(service)
-      && service.CompleteRestoreAfterLoadingScreen() {
+    if IsDefined(service) {
+      service.CompleteRestoreAfterLoadingScreen();
     }
   }
 }
@@ -49,8 +49,8 @@ public abstract class AWRadioLoadingBridge {
   public static func MuteLateFallback() -> Void {
     let service = AWRadioService.Get();
 
-    if IsDefined(service)
-      && service.MuteForLoadingScreen() {
+    if IsDefined(service) {
+      service.MuteForLoadingScreen();
     }
   }
 }
@@ -60,9 +60,17 @@ private func FastTravel() -> Void {
   let service = AWRadioService.Get();
 
   if this.IsFastTravelEnabled()
+    && IsDefined(this.GetPlayer()) {
+    AWRadioMusicDuckBridge.SetLoadingSuspended(
+      true,
+      n"world-map-fast-travel"
+    );
+  }
+
+  if this.IsFastTravelEnabled()
     && IsDefined(this.GetPlayer())
-    && IsDefined(service)
-    && service.MuteForLoadingScreen() {
+    && IsDefined(service) {
+    service.MuteForLoadingScreen();
   }
 
   wrappedMethod();
@@ -82,6 +90,11 @@ protected cb func OnLoadingScreenFinished(
 
   if value {
     AWRadioLoadingBridge.ScheduleSeekRestore();
+
+    AWRadioMusicDuckBridge.SetLoadingSuspended(
+      false,
+      n"loading-screen-finished"
+    );
   }
 
   return result;
