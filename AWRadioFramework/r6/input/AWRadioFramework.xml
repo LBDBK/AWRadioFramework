@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<bindings>
+  <context name="AWRadioFrameworkTrackControls">
+    <action name="AWRadioSkipSong" map="AWRadioSkipSong_Button" />
+    <action name="AWRadioToggleRepeatSong" map="AWRadioToggleRepeatSong_Button" />
+  </context>
+
+  <context name="Exploration" append="true">
+    <include name="AWRadioFrameworkTrackControls" />
+  </context>
+
+  <context name="VehicleDriveBase" append="true">
+    <include name="AWRadioFrameworkTrackControls" />
+  </context>
+
+  <context name="VehiclePassenger" append="true">
+    <include name="AWRadioFrameworkTrackControls" />
+  </context>
+
+  <mapping name="AWRadioSkipSong_Button" type="Button">
+    <button id="IK_L" overridableUI="AWRadioSkipSongKey" />
+  </mapping>
+
+  <mapping name="AWRadioToggleRepeatSong_Button" type="Button">
+    <button id="IK_U" overridableUI="AWRadioRepeatSongKey" />
+  </mapping>
+</bindings>
