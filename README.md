@@ -1,4 +1,4 @@
-# AWRadioFramework v0.70
+# AWRadioFramework
 
 **AWRadioFramework** is an event-driven custom radio framework for **Cyberpunk 2077**. It allows Audioware-powered station packs to appear and behave inside the game's native Radioport and vehicle-radio interfaces.
 
