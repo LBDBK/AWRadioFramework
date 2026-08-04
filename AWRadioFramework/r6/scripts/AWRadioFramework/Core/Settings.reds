@@ -36,7 +36,6 @@ public class AWRadioFrameworkSettings extends ScriptableSystem {
 
   private func OnAttach() -> Void {
     ModSettings.RegisterListenerToClass(this);
-
   }
 
   private func OnDetach() -> Void {
@@ -52,6 +51,5 @@ public class AWRadioFrameworkSettings extends ScriptableSystem {
         n"mod-settings"
       );
     }
-
   }
 }
