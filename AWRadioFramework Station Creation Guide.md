@@ -1,157 +1,163 @@
 # AWRadioFramework Station Creation Guide
 
-## Read this first
+This guide explains how to create and package a custom Cyberpunk 2077 radio station for **AWRadioFramework** using **AW Radio Station Builder v0.1**.
 
-This guide explains how to create a custom Cyberpunk 2077 radio station for **AWRadioFramework** without needing to understand programming.
+The Builder is the recommended workflow. It creates the Audioware manifest, Redscript station provider, TweakXL station record, packaged folder structure, and station README. Manual editing is still documented later for authors who need to inspect or adjust generated files.
 
-You will edit three small text files:
-
-1. `audios.yml` tells Audioware where your song files are.
-2. `MyStation.reds` tells AWRadioFramework the station name, track titles, track order, and the duration of each song.
-3. `MyStation.yaml` creates the station record that appears in Cyberpunk 2077.
-
-A custom icon is optional. The station works without one.
-
-Do **not** edit the framework files under:
-
-```text
-r6\scripts\AWRadioFramework\Core
-r6\scripts\AWRadioFramework\Integration
-```
-
-Your station is a separate station pack.
+AWRadioFramework itself provides the radio runtime. A station pack provides the music, metadata, station registration, and optional icon assets.
 
 ---
 
-# 1. What you need
+## 1. Before you begin
 
-Install AWRadioFramework and all of its required dependencies:
+Install AWRadioFramework and versions of these dependencies compatible with your current Cyberpunk 2077 game build:
 
 - RED4ext
 - redscript
 - Codeware
 - TweakXL
 - Audioware
+- Mod Settings
+- Input Loader
 
-Use a plain-text editor such as Notepad++ or Visual Studio Code.
+You also need:
 
-Do not use Microsoft Word. Word enjoys turning normal quotation marks into decorative quotation marks, which is charming until Redscript refuses to compile.
+- **AW Radio Station Builder v0.1**
+- One or more supported audio files
+- Permission to distribute every audio file and artwork asset included in the station pack
 
-Your music files must be one of these supported formats:
+Supported song formats:
 
-- `.wav`
-- `.ogg`
-- `.mp3`
-- `.flac`
-
-For normal songs, keep `usage: streaming`. Streaming is intended for long audio and avoids loading the whole song into memory at once.
+```text
+.wav
+.ogg
+.mp3
+.flac
+```
 
 Recommended audio preparation:
 
 - Use stereo audio.
 - Use 44.1 kHz or 48 kHz.
-- Cyberpunk 2077 commonly uses 48 kHz / 16-bit PCM audio.
 - Avoid DRM-protected files.
 - Use simple file names containing letters, numbers, and underscores.
+- Avoid characters that complicate paths or metadata, such as `#`, `:`, `?`, and quotation marks.
 
 Examples:
 
 ```text
-good_song_name.flac
+neon_velocity.flac
 artist_track_01.mp3
 night_drive.wav
 ```
 
-Avoid:
+---
 
-```text
-Track #1 (FINAL!!!).mp3
-My Song: Remastered?.flac
-```
+## 2. What the Builder creates
 
-Spaces may work, but simple file names prevent pointless path errors.
+AW Radio Station Builder v0.1:
 
-Only distribute songs you have permission to distribute.
+- Reads supported audio files.
+- Extracts available metadata.
+- Reads each track's real duration.
+- Creates the Audioware `audios.yml` manifest.
+- Creates the station Redscript provider.
+- Creates the station TweakXL record.
+- Copies the selected audio files into the station package.
+- Can include an existing optional station archive.
+- Generates a ready-to-install ZIP.
+- Generates station documentation.
+
+The Builder does **not** create custom icon assets such as:
+
+- `.inkatlas`
+- `.inkwidget`
+- `.xbm`
+- `.archive` resources
+
+It can include an archive you already prepared, but it does not build those resources for you.
+
+The Builder does **not** generate a project JSON file. JSON generation and its old checkbox were removed in v0.2.2.
 
 ---
 
-# 2. Copy the blank template
+## 3. Generated station layout
 
-Inside the creator kit, open:
-
-```text
-BLANK_STATION_PACK
-```
-
-Copy that entire folder somewhere safe and rename the copied folder to your station pack name.
-
-Example:
+A generated station uses this structure:
 
 ```text
-MyStationPack
+r6
+├─ audioware
+│  └─ YourStation
+│     ├─ audios.yml
+│     └─ tracks
+│        ├─ track_01.flac
+│        ├─ track_02.mp3
+│        └─ track_03.ogg
+├─ scripts
+│  └─ AWRadioFramework
+│     └─ Radios
+│        └─ YourStation
+│           └─ YourStation.reds
+└─ tweaks
+   └─ AWRadioFramework
+      └─ YourStation
+         └─ YourStation.yaml
+
+README_YourStation.txt
+
+archive
+└─ pc
+   └─ mod
+      └─ YourStation.archive          optional
 ```
 
-Do not copy the blank template into the game yet. It still contains placeholder names.
-
-The finished station will eventually have this structure:
+The shared parent folders are intentional:
 
 ```text
-MyStationPack
-├─ archive
-│  └─ pc
-│     └─ mod
-│        └─ MyStation.archive              OPTIONAL custom icon
-├─ r6
-│  ├─ audioware
-│  │  └─ MyStation
-│  │     ├─ audios.yml
-│  │     └─ tracks
-│  │        ├─ song_01.flac
-│  │        ├─ song_02.mp3
-│  │        └─ song_03.ogg
-│  ├─ scripts
-│  │  └─ AWRadioFramework
-│  │     └─ Radios
-│  │        └─ MyStation
-│  │           └─ MyStation.reds
-│  └─ tweaks
-│     └─ AWRadioFramework
-│        └─ MyStation
-│           └─ MyStation.yaml
+r6\scripts\AWRadioFramework\Radios
+r6\tweaks\AWRadioFramework
+r6\audioware
 ```
+
+Each station receives its own subfolder. Mod managers remove only the files and station-specific folders installed by that package, rather than deleting another station or the framework runtime.
+
+Never place station code inside:
+
+```text
+r6\scripts\AWRadioFramework\Core
+r6\scripts\AWRadioFramework\Integration
+```
+
+Those folders belong to the framework.
 
 ---
 
-# 3. Choose your station details
+## 4. Create a station with the Builder
 
-Fill in `STATION_DETAILS_WORKSHEET.txt` before editing anything.
+### Step 1: Prepare the tracks
 
-You need these values:
+Collect the songs you want to include in one folder.
 
-## Public station name
+Before importing them:
 
-This is the name players see in Radioport.
+- Confirm every file plays correctly.
+- Remove DRM-protected files.
+- Use clear file names.
+- Confirm you have permission to distribute them.
+- Avoid adding the same file twice unless that duplication is intentional.
 
-Example:
+The Builder automates most of the work for you.
 
-```text
-98.9 NIGHT CITY DNB
-```
+### Step 2: Open AW Radio Station Builder
 
-The frequency is only display text. It does not control any real frequency and does not need to match the internal station index.
+Start **AW Radio Station Builder v0.1**.
 
-Practical naming rules:
+Create a new station project and enter the station details described below.
 
-- Keep it reasonably short because the game UI can truncate long names.
-- Letters, numbers, spaces, periods, apostrophes, and hyphens are safest.
-- Do not use line breaks.
-- Avoid double quotation marks.
-- Avoid `#` and `:` unless you understand YAML quoting.
-- Use the exact same visible name in both `MyStation.reds` and `MyStation.yaml`.
+### Step 3: Choose an internal station name
 
-## Internal station name
-
-This is used only by the files.
+The internal name is used for generated folders, classes, Audioware IDs, and TweakDB records.
 
 Example:
 
@@ -159,14 +165,18 @@ Example:
 NightCityDNB
 ```
 
-Rules:
+Use:
 
-- Use letters and numbers only.
-- Underscores are also safe.
-- Do not use spaces.
-- Do not use hyphens.
-- Do not begin with a number.
-- Make it unique.
+- Letters
+- Numbers
+- Underscores
+
+Do not use:
+
+- Spaces
+- Hyphens
+- Path separators
+- A number as the first character
 
 Good examples:
 
@@ -176,188 +186,97 @@ SamuraiClassics
 DBK_Radio_One
 ```
 
-Bad examples:
+Avoid generic names such as:
 
 ```text
-98.9 Radio
-My-Radio
-My Radio
+Radio
+Music
+Station1
 ```
 
-## Station index
+A station-specific internal name reduces the chance of colliding with another mod.
 
-This is a unique positive whole number used internally.
+### Step 4: Choose the visible station name
+
+This is the name shown in Radioport.
 
 Example:
 
 ```text
-420
+98.9 NIGHT CITY DNB
 ```
 
-The same index must appear in both the `.reds` and `.yaml` files.
-
-Rules:
-
-- Do not use a vanilla station index.
-- Do not reuse an index from another custom station.
-- Use a positive whole number.
-- A value between `100` and `9999` is a practical choice.
-- The display frequency and station index are unrelated.
-
-## Station gain
-
-This controls the station's base volume before the Radioport volume setting is applied.
-
-Recommended:
-
-```text
-1.0
-```
+AWRadioFramework sorts custom stations using the numeric prefix of the visible name.
 
 Examples:
 
 ```text
-0.5 = quieter
-1.0 = normal
-1.2 = slightly louder
-2.0 = framework maximum
+88.4 INDUSTRIAL NOISE
+98.9 NIGHT CITY DNB
+104.2 AFTERLIFE RADIO
 ```
 
-Leave it at `1.0` for the first test.
+The visible frequency controls list placement only. It is not the internal station index.
 
----
+Keep the name reasonably short because the game UI may truncate long station names.
 
-# 4. Prepare your songs
+### Step 5: Choose a station index
 
-Put every song in:
+The station index is a unique positive integer used internally by the game and framework.
+
+For public station packs, use:
 
 ```text
-r6\audioware\MyStation\tracks
+1000-9999
 ```
 
-You may mix supported formats in one station.
+Indexes `0-999` are reserved by AWRadioFramework project convention for framework development, testing, or personal use. This is an allocation policy, not a claimed game-engine limit.
+
+The station index:
+
+- Must be unique.
+- Must not match another AWRadioFramework station.
+- Must be the same in the generated `.reds` and `.yaml` files.
+- Is unrelated to the displayed frequency.
 
 Example:
 
 ```text
-tracks\neon_velocity.flac
-tracks\afterlife_run.mp3
-tracks\city_at_3am.ogg
+Visible name: 98.9 NIGHT CITY DNB
+Station index: 4287
 ```
 
-## Find each song duration
+The Builder generates an index in the public range, but station authors should still verify that it is not already used by another installed station.
 
-AWRadioFramework currently requires the duration of every song in seconds.
+### Step 6: Set the station gain
 
-The test station changes tracks after 12 seconds because its template explicitly says:
+The gain controls the station's base playback level before the player's radio-volume setting is applied.
 
-```reds
-12.0
-```
-
-That number is not an Audioware format limit.
-
-### Windows method
-
-1. Right-click the song.
-2. Select **Properties**.
-3. Open the **Details** tab.
-4. Find **Length**.
-5. Convert minutes and seconds into total seconds.
-
-Formula:
+Recommended starting value:
 
 ```text
-total seconds = minutes × 60 + seconds
+0.30
 ```
 
-Examples:
+Test against several native stations before increasing it.
+
+### Step 7: Add the tracks
+
+Import the supported audio files.
+
+For each track, review the title shown by the Builder.
+
+Use a readable title such as:
 
 ```text
-2:30 = 150 seconds
-3:00 = 180 seconds
-3:15 = 195 seconds
-3:42 = 222 seconds
-4:05 = 245 seconds
-5:30 = 330 seconds
+Artist - Song Title
 ```
 
-Use a decimal duration when you know it:
+The title is shown in Radioport and in the native-style now-playing notification.
 
-```text
-222.4
-```
+Keep titles reasonably short. Very long titles may be truncated by the game UI.
 
-A whole number is acceptable for initial testing:
-
-```text
-222.0
-```
-
-Why accuracy matters:
-
-- Duration too short: the next song starts before the current one finishes.
-- Duration too long: the current song ends and the station waits in silence.
-- Correct duration: the next song starts at the intended time.
-
----
-
-# 5. Edit `audios.yml`
-
-Open:
-
-```text
-r6\audioware\MyStation\audios.yml.txt
-```
-
-When editing is complete, rename it to:
-
-```text
-audios.yml
-```
-
-The file uses this structure:
-
-```yaml
-version: 1.0.0
-
-sfx:
-  my_station_track_01:
-    file: tracks/song_01.flac
-    usage: streaming
-
-  my_station_track_02:
-    file: tracks/song_02.mp3
-    usage: streaming
-```
-
-For every song, you need one block.
-
-## What each line means
-
-```yaml
-my_station_track_01:
-```
-
-This is the **audio ID**.
-
-Rules:
-
-- It must be unique across the game and every installed mod.
-- Use lowercase letters, numbers, and underscores.
-- Do not use spaces.
-- Give every ID a station-specific prefix.
-- It must exactly match the first value in the corresponding `.reds` track entry.
-
-Good:
-
-```text
-nightcitydnb_neon_velocity
-dbkradio_track_01
-samuraiclassics_neverfadeaway
-```
-
-Bad:
+The Builder creates unique Audioware event IDs from the station data. Do not manually replace them with generic IDs such as:
 
 ```text
 track1
@@ -365,402 +284,60 @@ song
 music
 ```
 
-Generic IDs are much more likely to collide with another mod.
+Audioware event IDs are global and must not collide with another mod.
 
-```yaml
-file: tracks/song_01.flac
-```
+### Step 8: Add an optional station archive
 
-This is the path to the real audio file, relative to `audios.yml`.
+A custom icon is optional. The station works without one.
 
-The file name and extension must match exactly.
+When you already have a valid archive containing the station icon resources, the Builder can include that archive in the generated package.
 
-```yaml
-usage: streaming
-```
+The archive should contain the required resources, normally including the appropriate atlas and texture assets. The generated TweakXL record must reference the exact resource paths and atlas part names contained in that archive.
 
-Leave this unchanged for songs.
+Use unique internal depot paths.
 
-## Adding another song
-
-Copy one complete block:
-
-```yaml
-  my_station_track_03:
-    file: tracks/song_03.ogg
-    usage: streaming
-```
-
-Keep the indentation exactly as shown:
-
-- Two spaces before the audio ID.
-- Four spaces before `file`.
-- Four spaces before `usage`.
-- Do not use tabs.
-
-## Removing a song
-
-Delete its complete block from `audios.yml`.
-
-You must also delete the matching track block from `MyStation.reds`.
-
----
-
-# 6. Edit `MyStation.reds`
-
-Open:
+Good:
 
 ```text
-r6\scripts\AWRadioFramework\Radios\MyStation\MyStation.reds.txt
+base\icon\your_desired_name.xbm
 ```
 
-When editing is complete, rename it to:
-
-```text
-MyStation.reds
-```
-
-## Station definition
-
-This block creates the station:
-
-```reds
-let station = AWRadioStationDefinition.Create(
-  t"RadioStation.MyStation",
-  120,
-  n"104.2 MY STATION",
-  1.0
-);
-```
-
-Change each value carefully.
-
-### Record name
-
-```reds
-t"RadioStation.MyStation"
-```
-
-Replace `MyStation` with your unique internal station name.
-
-Example:
-
-```reds
-t"RadioStation.NightCityDNB"
-```
-
-This must exactly match the record name in `MyStation.yaml`.
-
-### Station index
-
-```reds
-120
-```
-
-Replace it with your chosen unique station index.
-
-Example:
-
-```reds
-420
-```
-
-This must exactly match the `index` value in `MyStation.yaml`.
-
-### Visible station name
-
-```reds
-n"104.2 MY STATION"
-```
-
-Replace the text inside the quotation marks.
-
-Example:
-
-```reds
-n"98.9 NIGHT CITY DNB"
-```
-
-Do not remove:
-
-```text
-n"
-"
-```
-
-### Station gain
-
-```reds
-1.0
-```
-
-Leave this at `1.0` for the first test.
-
-## Track definition
-
-Every song needs one block:
-
-```reds
-station.AddTrack(
-  AWRadioTrackDefinition.Create(
-    n"my_station_track_01",
-    "Artist - Song Title",
-    222.0
-  )
-);
-```
-
-### Audio ID
-
-```reds
-n"my_station_track_01"
-```
-
-This must exactly match the audio ID in `audios.yml`.
-
-Example manifest ID:
-
-```yaml
-nightcitydnb_neon_velocity:
-```
-
-Matching Redscript ID:
-
-```reds
-n"nightcitydnb_neon_velocity"
-```
-
-Treat IDs as case-sensitive. Copy and paste rather than retyping.
-
-### Track title
-
-```reds
-"Artist - Song Title"
-```
-
-This is the title displayed by the radio UI.
-
-Example:
-
-```reds
-"Nova Static - Neon Velocity"
-```
-
-The title does not need to match the file name.
-
-Keep titles reasonably short because the UI can truncate long text.
-
-Avoid double quotation marks inside the title.
-
-### Duration
-
-```reds
-222.0
-```
-
-This is the song duration in seconds.
-
-It controls when the framework advances to the next track.
-
-## Adding more songs
-
-Copy the entire track block and change all three values:
-
-```reds
-station.AddTrack(
-  AWRadioTrackDefinition.Create(
-    n"nightcitydnb_afterlife_run",
-    "Chrome Pulse - Afterlife Run",
-    245.0
-  )
-);
-```
-
-## Provider names
-
-The template contains:
-
-```reds
-public abstract class MyStationFactory
-public class MyStationProvider
-```
-
-Replace `MyStation` with your internal station name.
-
-Example:
-
-```reds
-public abstract class NightCityDNBFactory
-public class NightCityDNBProvider
-```
-
-Also change the module name at the top:
-
-```reds
-module MyRadioStation
-```
-
-Example:
-
-```reds
-module NightCityDNB
-```
-
-The provider must build the matching factory:
-
-```reds
-framework.RegisterStation(
-  NightCityDNBFactory.Build()
-);
-```
-
-The completed example in this kit shows all of these changes together.
-
----
-
-# 7. Edit `MyStation.yaml`
-
-Choose one template:
-
-```text
-MyStation_NO_CUSTOM_ICON.yaml.txt
-MyStation_CUSTOM_ICON.yaml.txt
-```
-
-Rename the chosen file to:
-
-```text
-MyStation.yaml
-```
-
-Delete the unused template from your station pack.
-
-## Option A: no custom icon
-
-This is the easiest choice for the first test:
-
-```yaml
-RadioStation.MyStation:
-  $base: RadioStation.Pop
-  displayName: 104.2 MY STATION
-  icon: UIIcon.ICEMinor
-  index: 120
-```
-
-Change:
-
-```text
-RadioStation.MyStation
-104.2 MY STATION
-120
-```
-
-The record name, display name, and index must match `MyStation.reds`.
-
-## Option B: custom icon
-
-Use this only when you have a working `.archive` containing an `.inkatlas` and `.xbm`.
-
-Example:
-
-```yaml
-UIIcon.MyStation:
-  $base: UIIcon.ICEMinor
-  atlasResourcePath: base\my_station\icons\my_station.inkatlas
-  atlasPartName: icon_part
-
-RadioStation.MyStation:
-  $base: RadioStation.Pop
-  displayName: 104.2 MY STATION
-  icon: UIIcon.MyStation
-  index: 120
-```
-
-You must change:
-
-- `UIIcon.MyStation`
-- `RadioStation.MyStation`
-- `displayName`
-- `index`
-- `atlasResourcePath`
-- `atlasPartName`
-
-The icon archive belongs in:
-
-```text
-archive\pc\mod
-```
-
-The resource path and atlas part must match the contents of the archive exactly.
-
-For release, use unique internal depot paths. Do not use generic paths such as:
+Avoid generic paths:
 
 ```text
 base\icon\radio.xbm
 ```
 
-Use something specific:
+Generic paths can collide with another mod.
+
+### Step 9: Build the station package
+
+Review the station information and generate the ZIP.
+
+Before installation, open the ZIP and confirm that it contains the expected station-specific paths:
 
 ```text
-base\my_mod_name\radio_icons\my_station.xbm
+r6\audioware\<Station>\
+r6\scripts\AWRadioFramework\Radios\<Station>\
+r6\tweaks\AWRadioFramework\<Station>\
 ```
 
-This avoids another mod overwriting the same resource path.
+An optional icon archive belongs under:
+
+```text
+archive\pc\mod\
+```
+
+The station ZIP must not contain AWRadioFramework's `Core` or `Integration` scripts.
 
 ---
 
-# 8. Rename folders and files
+## 5. Install the generated station
 
-For neatness, rename the three `MyStation` folders to your internal station name.
-
-Example:
-
-```text
-r6\audioware\NightCityDNB
-r6\scripts\AWRadioFramework\Radios\NightCityDNB
-r6\tweaks\AWRadioFramework\NightCityDNB
-```
-
-Rename the files:
-
-```text
-MyStation.reds → NightCityDNB.reds
-MyStation.yaml → NightCityDNB.yaml
-```
-
-The file names themselves are not used as station IDs, but consistent naming makes troubleshooting much easier.
-
-The final files must not end in `.txt`.
-
-Correct:
-
-```text
-audios.yml
-NightCityDNB.reds
-NightCityDNB.yaml
-```
-
-Wrong:
-
-```text
-audios.yml.txt
-NightCityDNB.reds.txt
-NightCityDNB.yaml.txt
-```
-
-Windows may hide known file extensions. In File Explorer, enable:
-
-```text
-View → Show → File name extensions
-```
-
----
-
-# 9. Install the station pack
-
-Your station pack folder should contain `r6` and optionally `archive`.
-
-Copy those folders into the Cyberpunk 2077 game root.
+1. Install AWRadioFramework and all required dependencies.
+2. Extract the generated station ZIP into the Cyberpunk 2077 game directory, or install it through a mod manager.
+3. Confirm that the station files are located under their generated paths.
+4. Fully close and restart the game.
 
 Example game root:
 
@@ -773,250 +350,505 @@ Cyberpunk 2077
 └─ red4ext
 ```
 
-Merge the folders when Windows asks.
+A full restart is required after changing:
 
-Perform a **full game restart** after changing:
-
+- Station Redscript
+- TweakXL records
 - `audios.yml`
-- audio files
-- `.reds`
-- `.yaml`
-- icon archives
+- Audio files
+- Input files
+- Icon archives
 
-Audioware builds its audio bank during game startup. Returning to the main menu is not enough.
-
----
-
-# 10. First test procedure
-
-Use a small test station first, ideally two or three songs.
-
-1. Start the game.
-2. Check for Redscript compilation errors.
-3. Load a save.
-4. Open Radioport.
-5. Confirm the station appears.
-6. Select the station.
-7. Confirm the correct first song starts.
-8. Confirm the displayed title is correct.
-9. Wait for the exact song transition.
-10. Test Radioport volume.
-11. Test short Z press on foot.
-12. Mount a vehicle.
-13. Confirm no native station plays over the custom station.
-14. Test short R press.
-15. Exit the vehicle.
-16. Confirm playback and the on-foot button state transfer correctly.
-17. Let the last song finish and confirm the station returns to track 1.
+Returning to the main menu is not enough. Audioware prepares its audio bank during startup.
 
 ---
 
-# 11. Troubleshooting
+## 6. First test procedure
 
-## The station does not appear
+Use a small station with two or three tracks for the first test.
 
-Check:
+### Startup and registration
 
-- The `.yaml` file no longer ends in `.txt`.
-- The `.reds` file no longer ends in `.txt`.
-- The record name matches in both files.
-- The station index matches in both files.
-- The station index is not already used.
-- Redscript compiled successfully.
-- TweakXL loaded the YAML.
+1. Start the game from a full restart.
+2. Confirm Redscript compiles successfully.
+3. Reach the main menu.
+4. Confirm no AWRadioFramework conflict warning appears.
+5. When a warning appears, read it and fix the duplicate index or TweakDB record before continuing.
 
-## The station appears but no song plays
+### Radioport
 
-Check:
+1. Load a save.
+2. Open Radioport.
+3. Confirm the station appears once.
+4. Confirm it is placed according to the visible numeric frequency.
+5. Select the station.
+6. Confirm the expected track starts.
+7. Confirm the station and track notification appears.
+8. Confirm the title shown in Radioport is correct.
 
-- `audios.yml` is in the correct station folder.
-- The audio file exists in the declared `tracks` path.
-- The audio format is `.wav`, `.ogg`, `.mp3`, or `.flac`.
-- The audio ID matches exactly between `audios.yml` and `.reds`.
-- `usage: streaming` is indented correctly.
-- The file is not DRM-protected.
-- The game was fully restarted.
+### Track playback
 
-Audioware validation logs are under:
+1. Allow a track to end naturally.
+2. Confirm the next shuffled track starts.
+3. Confirm tracks do not simply play in the original file order.
+4. Test **Skip Song**.
+5. Test **Repeat Song**.
+6. Confirm the now-playing title updates after Skip and natural track changes.
+
+---
+
+## 7. Duplicate-station protection
+
+AWRadioFramework checks registered stations for:
+
+- Duplicate internal station indexes
+- Duplicate TweakDB station record IDs
+
+When a conflict is found:
+
+- The first accepted station remains registered.
+- The conflicting station definition is rejected.
+- A persistent warning appears on the main menu.
+- The warning names both conflicting stations and records.
+- The warning remains visible until **OK** is pressed.
+
+After fixing a conflict:
+
+1. Update the affected station.
+2. Ensure the station index and record are unique.
+3. Rebuild the package when necessary.
+4. Fully restart the game.
+
+The warning does not validate every station file. It does not replace checks for:
+
+- Incorrect Audioware paths
+- Missing audio files
+- Invalid icon resources
+- Incorrect track metadata
+- Manually mismatched Redscript and TweakXL values
+- Incorrect runtime durations
+
+---
+
+## 8. Understanding the generated files
+
+Most users do not need to edit these files. This section exists for station authors who want to inspect or adjust Builder output.
+
+### `audios.yml`
+
+Location:
 
 ```text
-red4ext\logs
+r6\audioware\YourStation\audios.yml
 ```
 
-Look for an Audioware log file and search for your audio ID.
+This file maps unique Audioware event IDs to audio files.
 
-## A song changes after 12 seconds
+Example:
 
-The track still has:
+```yaml
+version: 1.0.0
+
+sfx:
+  nightcitydnb_neon_velocity:
+    file: tracks/neon_velocity.flac
+    usage: streaming
+```
+
+The event ID:
+
+```text
+nightcitydnb_neon_velocity
+```
+
+must exactly match the corresponding Redscript track ID.
+
+For full songs, keep:
+
+```yaml
+usage: streaming
+```
+
+Use spaces for indentation, not tabs.
+
+### Station Redscript
+
+Location:
+
+```text
+r6\scripts\AWRadioFramework\Radios\YourStation\YourStation.reds
+```
+
+The station definition contains values equivalent to:
 
 ```reds
-12.0
+let station = AWRadioStationDefinition.Create(
+  t"RadioStation.NightCityDNB",
+  4287,
+  n"98.9 NIGHT CITY DNB",
+  1.0
+);
 ```
 
-Replace it with the real duration in seconds.
+These values are:
 
-## The next song starts too early
+1. TweakDB station record
+2. Internal station index
+3. Visible station name
+4. Gain
 
-The duration in `.reds` is shorter than the real song.
-
-## There is silence before the next song
-
-The duration in `.reds` is longer than the real song.
-
-## The wrong title appears
-
-Change the second value in the matching track block:
+A generated track entry contains values equivalent to:
 
 ```reds
-"Artist - Song Title"
+station.AddTrack(
+  AWRadioTrackDefinition.Create(
+    n"nightcitydnb_neon_velocity",
+    "Nova Static - Neon Velocity",
+    223.4
+  )
+);
 ```
 
-## The wrong file plays
+These values are:
 
-The audio ID points to the wrong file in `audios.yml`, or two entries were copied without changing the ID.
+1. Audioware event ID
+2. Visible track title
+3. Runtime duration in seconds
 
-## The station is rejected
+For Builder v0.2.2 output, the runtime duration is the real audio duration plus `1.000` second.
 
-AWRadioFramework rejects:
+### TweakXL station record
 
-- Negative station indexes.
-- Stations with no tracks.
-- Duplicate station indexes.
-- Duplicate station record IDs.
+Location:
 
-## Another mod breaks the station
+```text
+r6\tweaks\AWRadioFramework\YourStation\YourStation.yaml
+```
 
-Check for collisions in:
+A basic station record is equivalent to:
 
-- Station index.
-- `RadioStation.*` record name.
-- `UIIcon.*` record name.
-- Audioware audio IDs.
-- Icon archive depot paths.
+```yaml
+RadioStation.NightCityDNB:
+  $base: RadioStation.Pop
+  displayName: 98.9 NIGHT CITY DNB
+  icon: UIIcon.ICEMinor
+  index: 4287
+```
 
-Every internal name should have a unique prefix.
+The record ID and index must match the generated Redscript.
 
----
-
-# 12. Current framework behaviour and limitations
-
-Current behaviour:
-
-- Pause and resume preserve the current track position.
-- Radioport volume affects the custom station.
-- On-foot and vehicle radio transfers are supported.
-- Station and track titles use the native radio UI.
-- Custom station icons are supported through a TweakXL `UIIcon` record and an archive.
-
-Current limitations:
-
-- Song duration is entered manually.
-- No web-stream support yet.
-- No independent always-running broadcast timeline.
-- Very long station and track names may be truncated by the game UI.
-- Changes require a full game restart.
+A custom icon uses a separate `UIIcon.*` record that references the resources packaged in the optional archive.
 
 ---
 
-# 13. Final release checklist
+## 9. Values that must remain consistent
 
-Before sharing a station pack:
+After using the Builder, consistency is handled automatically. Problems usually appear only after manual editing.
 
-- [ ] You have permission to distribute every audio file.
-- [ ] All audio IDs have a unique station-specific prefix.
-- [ ] The station record name is unique.
-- [ ] The UI icon record name is unique.
-- [ ] The station index is unique.
-- [ ] The same station index appears in `.reds` and `.yaml`.
-- [ ] The same record name appears in `.reds` and `.yaml`.
-- [ ] Every manifest audio ID has one matching `.reds` track.
-- [ ] Every `.reds` track has one matching manifest audio ID.
-- [ ] Every declared audio file exists.
-- [ ] Every song duration has been tested.
-- [ ] Audio files use `.wav`, `.ogg`, `.mp3`, or `.flac`.
-- [ ] Songs use `usage: streaming`.
-- [ ] No template file still ends in `.txt`.
-- [ ] The station works on foot.
-- [ ] The station works in a vehicle.
-- [ ] Mount and unmount do not start a second native station.
-- [ ] Volume, pause, resume, title, equalizer, and icon were tested.
-- [ ] The pack does not include or overwrite AWRadioFramework core scripts.
-- [ ] The pack documentation lists AWRadioFramework and its dependencies.
+### TweakDB station record
 
----
-
-# 14. The four values that must match
-
-Most station problems come from one of these values not matching.
-
-## Station record
-
-`MyStation.reds`:
+Redscript:
 
 ```reds
 t"RadioStation.NightCityDNB"
 ```
 
-`MyStation.yaml`:
+TweakXL:
 
 ```yaml
 RadioStation.NightCityDNB:
 ```
 
-## Station index
+### Station index
 
-`MyStation.reds`:
+Redscript:
 
 ```reds
-420
+4287
 ```
 
-`MyStation.yaml`:
+TweakXL:
 
 ```yaml
-index: 420
+index: 4287
 ```
 
-## Visible station name
+### Visible station name
 
-`MyStation.reds`:
+Redscript:
 
 ```reds
 n"98.9 NIGHT CITY DNB"
 ```
 
-`MyStation.yaml`:
+TweakXL:
 
 ```yaml
 displayName: 98.9 NIGHT CITY DNB
 ```
 
-## Audio ID
+### Audioware event ID
 
-`audios.yml`:
+Audioware manifest:
 
 ```yaml
 nightcitydnb_neon_velocity:
 ```
 
-`MyStation.reds`:
+Redscript:
 
 ```reds
 n"nightcitydnb_neon_velocity"
 ```
 
-# 15. Completed example
+Treat internal IDs as case-sensitive. Copy and paste them rather than retyping them.
 
-Open:
+---
+
+## 10. Safe manual changes after generation
+
+Regenerating through the Builder is preferred. When manually editing output, change only station-specific files.
+
+Safe station-specific paths:
 
 ```text
-EXAMPLE_FINISHED_STATION
+r6\audioware\<Station>\
+r6\scripts\AWRadioFramework\Radios\<Station>\
+r6\tweaks\AWRadioFramework\<Station>\
+archive\pc\mod\<Station>.archive
 ```
 
-It contains a complete three-track example named:
+Do not edit:
+
+```text
+r6\scripts\AWRadioFramework\Core\
+r6\scripts\AWRadioFramework\Integration\
+```
+
+### Change a visible station name
+
+Update the same visible name in:
+
+- The generated Redscript
+- The generated TweakXL record
+
+Keep the numeric frequency prefix when frequency-based sorting is desired.
+
+### Change a station index
+
+Update the same positive integer in:
+
+- The generated Redscript
+- The generated TweakXL record
+
+Use `1000-9999` for a public station release and confirm it does not collide with another station.
+
+### Change station gain
+
+Change the gain value in the Redscript station definition.
+
+Retest against native stations after every gain adjustment.
+
+### Change a track title
+
+Change the visible title in the corresponding Redscript track definition.
+
+This does not require renaming the real audio file or Audioware event ID.
+
+### Replace an audio file
+
+The safest method is to rebuild the station.
+
+When replacing it manually:
+
+- Keep the manifest path correct.
+- Keep the event ID consistent.
+- Update the runtime duration.
+
+### Add or remove tracks
+
+Rebuilding with the Builder is strongly recommended.
+
+Manual addition requires matching changes in:
+
+- `audios.yml`
+- The Redscript track list
+- The packaged `tracks` folder
+
+Every manifest event must have one matching Redscript track, and every Redscript track must have one matching manifest event.
+
+---
+
+## 11. Troubleshooting
+
+### The station does not appear
+
+Check:
+
+- AWRadioFramework is installed.
+- All required dependencies are installed.
+- The station Redscript is under:
+
+  ```text
+  r6\scripts\AWRadioFramework\Radios\<Station>\
+  ```
+
+- The TweakXL file is under:
+
+  ```text
+  r6\tweaks\AWRadioFramework\<Station>\
+  ```
+
+- Redscript compiled successfully.
+- TweakXL loaded the station record.
+- The main menu did not report a duplicate index or TweakDB record.
+- The game was fully restarted.
+
+When the package was manually edited, also confirm the record ID, station index, and visible name match between Redscript and TweakXL.
+
+### Only one of two custom stations appears
+
+The second station was probably rejected because both packs use:
+
+- The same internal station index, or
+- The same `RadioStation.*` TweakDB record
+
+Read the persistent main-menu warning, fix the conflicting station, then fully restart the game.
+
+### The station appears at the bottom of the list
+
+Confirm the visible station name begins with a numeric frequency followed by a space:
 
 ```text
 98.9 NIGHT CITY DNB
 ```
 
-The example audio files are not included. Its purpose is to show exactly how all identifiers, names, paths, titles, and durations correspond across the three configuration files.
+The station index does not control list placement.
+
+### The station appears but no audio plays
+
+Check:
+
+- Audioware loaded successfully.
+- `audios.yml` is in the generated station folder.
+- Every declared file exists under `tracks`.
+- File names and extensions match exactly.
+- Audioware event IDs match the Redscript IDs.
+- `usage: streaming` is present.
+- The files are not DRM-protected.
+- The station gain is greater than `0.0`.
+- The game was fully restarted.
+
+Audioware logs are normally under:
+
+```text
+red4ext\logs
+```
+
+Search the relevant Audioware log for the station's event ID or file path.
+
+### The wrong song plays
+
+Check whether:
+
+- The event ID points to the wrong file in `audios.yml`.
+- A manually copied entry retained another track's event ID.
+- The same event ID is used by more than one track or mod.
+
+Rebuild the station when the generated mapping has become difficult to verify.
+
+### Track title does not update
+
+Check:
+
+- The generated Redscript title is not empty.
+- The track has a valid runtime duration.
+- The Audioware event ID matches.
+- Another mod is not replacing the same Radioport title or notification methods.
+
+### The station icon is missing
+
+Check:
+
+- The optional archive is installed under `archive\pc\mod`.
+- The TweakXL icon record exists.
+- `atlasResourcePath` matches the actual archive resource.
+- `atlasPartName` matches the atlas.
+- The Ink atlas and XBM paths are correct.
+- TweakXL does not report a non-existent record or flat.
+
+The Builder packages existing icon resources but does not create them.
+
+### Skip Song or Repeat Song does not work
+
+Check:
+
+- Input Loader is installed.
+- Mod Settings is installed.
+- The bindings under **AW Radio Settings** are not colliding with another action.
+- A custom station is active.
+- The station is not manually paused.
+
+---
+
+## 13. Uninstalling a station pack
+
+Remove only the files belonging to that station.
+
+Common paths:
+
+```text
+Cyberpunk 2077\r6\audioware\<Station>\
+Cyberpunk 2077\r6\scripts\AWRadioFramework\Radios\<Station>\
+Cyberpunk 2077\r6\tweaks\AWRadioFramework\<Station>\
+Cyberpunk 2077\archive\pc\mod\<Station>.archive
+```
+
+Do not delete shared parent folders when they still contain AWRadioFramework or other station packs.
+
+Perform a full game restart after uninstalling a station.
+
+---
+
+## 14. Final release checklist
+
+Before publishing a station pack:
+
+- [ ] The package was generated with the current Builder.
+- [ ] You have permission to distribute every audio and artwork asset.
+- [ ] The internal station name is unique and station-specific.
+- [ ] The `RadioStation.*` record is unique.
+- [ ] The station index is unique.
+- [ ] A public station uses the `1000-9999` range.
+- [ ] The visible name begins with a numeric frequency when ordered placement is wanted.
+- [ ] Every Audioware event ID has a unique station-specific prefix.
+- [ ] Every imported audio file exists in the generated `tracks` folder.
+- [ ] Every track has a readable title.
+- [ ] Builder-generated runtime durations were not manually increased by another second.
+- [ ] Songs use `usage: streaming`.
+- [ ] The package contains no AWRadioFramework `Core` or `Integration` scripts.
+- [ ] The station appears in Radioport.
+- [ ] The station order is correct.
+- [ ] Natural track changes were tested.
+- [ ] Skip and Repeat were tested.
+- [ ] An optional icon archive uses unique resource paths.
+- [ ] The generated README lists AWRadioFramework and all required dependencies.
+- [ ] The final ZIP installs from the Cyberpunk 2077 game root.
+
+---
+
+## 15. Summary
+
+For most station authors, the complete workflow is:
+
+1. Prepare supported audio files.
+2. Create the station in AW Radio Station Builder v0.1
+3. Review the station name, public-range index, gain, track titles, and durations.
+4. Add an existing optional icon archive when needed.
+5. Generate the ready-to-install ZIP.
+6. Install it with AWRadioFramework and its dependencies.
+7. Fully restart the game.
+8. Test Radioport, track changes, controls and so on.
+9. Publish only after confirming all of the above.
+
+Manual editing should be the exception, not the default. The Builder exists so station creation does not require hand-maintaining three interdependent files while hoping every identifier remains identical, a pastime humanity had already suffered enough.
