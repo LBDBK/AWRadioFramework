@@ -46,6 +46,10 @@ public func HandleRestrictionStateChanged() -> Void {
   wrappedMethod();
 
   if IsDefined(service) {
+    service.SetNativePocketRadioRestricted(
+      this.IsRestricted()
+    );
+
     service.SyncConversationNativeAvailability(
       this.IsRestricted()
     );

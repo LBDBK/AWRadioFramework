@@ -22,7 +22,6 @@ public abstract class AWRadioPlaybackUIBridge {
     );
 
     selectedRowState.ScheduleRefresh();
-
   }
 }
 

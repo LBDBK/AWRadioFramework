@@ -77,7 +77,6 @@ public class AWRadioSelectedRowService extends ScriptableService {
     }
 
     this.m_activeRecordIndex = recordIndex;
-
   }
 
   public func GetActiveRecordIndex() -> Int32 {
@@ -119,7 +118,6 @@ public class AWRadioSelectedRowService extends ScriptableService {
     GameInstance
       .GetDelaySystem(GetGameInstance())
       .DelayCallback(callback, 0.10, false);
-
   }
 
   public func RefreshVisibleRows(
@@ -152,7 +150,6 @@ public class AWRadioSelectedRowService extends ScriptableService {
     );
 
     if !IsDefined(updateFunction) {
-
       return;
     }
 
@@ -168,13 +165,11 @@ public class AWRadioSelectedRowService extends ScriptableService {
           args,
           status
         );
-
       }
 
       i += 1;
     }
 
     this.m_controllers = retained;
-
   }
 }

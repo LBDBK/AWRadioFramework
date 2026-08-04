@@ -136,7 +136,6 @@ public class AWRadioVolumeSettingsListener extends ConfigVarListener {
     targetVariable.SetValue(value);
 
     this.m_isMirroring = false;
-
   }
 }
 
@@ -153,7 +152,6 @@ public class AWRadioVolumeSubSystem extends ScriptableSystem {
     );
 
     this.m_listener.Start();
-
   }
 
   private func OnDetach() -> Void {

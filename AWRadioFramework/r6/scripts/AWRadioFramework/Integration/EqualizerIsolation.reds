@@ -188,7 +188,6 @@ public abstract class AWRadioSelectedRowUI {
 
     if codeSet && equalizerSet {
       state.ClearForcedController(controller);
-
     }
   }
 
@@ -264,7 +263,6 @@ public abstract class AWRadioSelectedRowUI {
 
     if equalizerSet && codeSet {
       state.MarkForcedController(controller);
-
     }
   }
 }

@@ -210,7 +210,6 @@ public abstract class AWRadioVehicleTransitionBridge {
       n"radioIndex",
       service.GetActiveStationIndex()
     ) {
-
       return true;
     }
 
@@ -247,12 +246,11 @@ public abstract class AWRadioVehicleTransitionBridge {
     component = vehicle.GetVehicleComponent();
 
     if IsDefined(component) {
-      AWRadioVehicleTransitionBridge
-        .SetComponentBoolProperty(
-          component,
-          n"radioState",
-          isPlaying
-        );
+      AWRadioVehicleTransitionBridge.SetComponentBoolProperty(
+        component,
+        n"radioState",
+        isPlaying
+      );
     }
 
     blackboard = vehicle.GetBlackboard();
@@ -387,7 +385,6 @@ protected func OnEnter(
         0.50,
         n"mount-500ms"
       );
-
   }
 }
 

@@ -19,7 +19,6 @@ public abstract class AWRadioPocketStateBridge {
     event.station = station;
 
     player.QueueEvent(event);
-
   }
 }
 
@@ -58,7 +57,6 @@ public final func SendRadioEvent(
       activeIndex = service.GetActiveStationIndex();
 
       if toggle && NotEquals(activeIndex, station) {
-
         wrappedMethod(false, false, -1);
       }
 
@@ -89,8 +87,7 @@ public final func SendRadioEvent(
         } else {
           savedStationState.RecordNativeRadioEvent(
             toggle,
-            setStation,
-            station
+            setStation
           );
         }
       }

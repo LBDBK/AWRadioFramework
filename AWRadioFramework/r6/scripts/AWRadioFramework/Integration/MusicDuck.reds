@@ -67,6 +67,7 @@ public class AWRadioMusicDuckSystem extends ScriptableSystem {
   private let m_radioPlaying: Bool;
   private let m_loadingSuspended: Bool;
   private let m_restrictionSuspended: Bool;
+  private let m_combatSuspended: Bool;
 
   private let m_isDucked: Bool;
   private let m_hasSavedMusicVolume: Bool;
@@ -100,7 +101,6 @@ public class AWRadioMusicDuckSystem extends ScriptableSystem {
     this.m_listener = new AWRadioMusicVolumeListener();
     this.m_listener.Initialize(this);
     this.m_listener.Start();
-
   }
 
   private func OnDetach() -> Void {
@@ -111,6 +111,7 @@ public class AWRadioMusicDuckSystem extends ScriptableSystem {
     this.m_radioPlaying = false;
     this.m_loadingSuspended = false;
     this.m_restrictionSuspended = false;
+    this.m_combatSuspended = false;
     this.m_player = null;
     this.m_listener = null;
     this.m_callbackSystem = null;
@@ -125,6 +126,7 @@ public class AWRadioMusicDuckSystem extends ScriptableSystem {
     this.m_radioPlaying = false;
     this.m_loadingSuspended = false;
     this.m_restrictionSuspended = false;
+    this.m_combatSuspended = false;
     this.m_player = null;
 
     if !IsDefined(event) || event.IsPreGame() {
@@ -137,7 +139,6 @@ public class AWRadioMusicDuckSystem extends ScriptableSystem {
     this.m_player = GetPlayer(this.GetGameInstance());
 
     if !IsDefined(this.m_player) {
-
       this.ScheduleRefresh(
         0.50,
         this.m_generation,
@@ -156,7 +157,6 @@ public class AWRadioMusicDuckSystem extends ScriptableSystem {
         n"gameplay-session-ready"
       );
     }
-
   }
 
   private cb func OnSessionBeforeEnd(
@@ -169,15 +169,14 @@ public class AWRadioMusicDuckSystem extends ScriptableSystem {
     this.m_radioPlaying = false;
     this.m_loadingSuspended = false;
     this.m_restrictionSuspended = false;
+    this.m_combatSuspended = false;
     this.m_player = null;
-
   }
 
   public func OnFeatureSettingChanged(
     enabled: Bool,
     source: CName
   ) -> Void {
-
     if !enabled {
       this.RestoreMusicVolume(source);
       return;
@@ -244,6 +243,26 @@ public class AWRadioMusicDuckSystem extends ScriptableSystem {
     }
   }
 
+  public func SetCombatSuspended(
+    suspended: Bool,
+    source: CName
+  ) -> Void {
+    if !this.m_gameplaySession {
+      return;
+    }
+
+    this.m_combatSuspended = suspended;
+
+    if !suspended {
+      this.RefreshCurrentRadioState(
+        this.m_generation,
+        source
+      );
+    } else {
+      this.Refresh(source);
+    }
+  }
+
   public func RefreshCurrentRadioState(
     generation: Int32,
     source: CName
@@ -256,7 +275,6 @@ public class AWRadioMusicDuckSystem extends ScriptableSystem {
     this.m_player = GetPlayer(this.GetGameInstance());
 
     if !IsDefined(this.m_player) {
-
       return;
     }
 
@@ -299,7 +317,6 @@ public class AWRadioMusicDuckSystem extends ScriptableSystem {
 
     this.m_savedMusicVolume = value;
     this.m_hasSavedMusicVolume = true;
-
   }
 
   private func ScheduleRefresh(
@@ -334,7 +351,8 @@ public class AWRadioMusicDuckSystem extends ScriptableSystem {
       && this.CanUseGameplayAudio()
       && this.m_radioPlaying
       && !this.m_loadingSuspended
-      && !this.m_restrictionSuspended;
+      && !this.m_restrictionSuspended
+      && !this.m_combatSuspended;
 
     if shouldDuck {
       this.DuckMusicVolume(source);
@@ -365,7 +383,6 @@ public class AWRadioMusicDuckSystem extends ScriptableSystem {
     variable = this.GetMusicVolumeSetting();
 
     if !IsDefined(variable) {
-
       return false;
     }
 
@@ -460,7 +477,6 @@ public class AWRadioMusicDuckSystem extends ScriptableSystem {
     this.m_internalWrite = true;
     variable.SetValue(value);
     this.m_internalWrite = false;
-
   }
 
   private func GetMusicVolumeSetting() -> ref<ConfigVarInt> {
@@ -632,6 +648,20 @@ public abstract class AWRadioMusicDuckBridge {
 
     if IsDefined(system) {
       system.SetRestrictionSuspended(
+        suspended,
+        source
+      );
+    }
+  }
+
+  public static func SetCombatSuspended(
+    suspended: Bool,
+    source: CName
+  ) -> Void {
+    let system = AWRadioMusicDuckSystem.Get();
+
+    if IsDefined(system) {
+      system.SetCombatSuspended(
         suspended,
         source
       );

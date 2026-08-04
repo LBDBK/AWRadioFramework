@@ -22,14 +22,12 @@ public abstract class AWRadioTrackUIHelper {
     );
 
     if !IsDefined(controllerClass) {
-
       return false;
     }
 
     trackNameProperty = controllerClass.GetProperty(n"trackName");
 
     if !IsDefined(trackNameProperty) {
-
       return false;
     }
 

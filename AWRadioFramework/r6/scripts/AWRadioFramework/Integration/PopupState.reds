@@ -3,7 +3,6 @@ module AWRadioFramework
 import Codeware.*
 
 public abstract class AWRadioPopupStateHelper {
-
   private static func GetNumericProperty(
     controller: ref<VehicleRadioPopupGameController>,
     propertyName: CName
@@ -115,14 +114,12 @@ public abstract class AWRadioPopupStateHelper {
     property = controllerClass.GetProperty(propertyName);
 
     if !IsDefined(property) {
-
       return false;
     }
 
     propertyType = property.GetType();
 
     if !IsDefined(propertyType) {
-
       return false;
     }
 
@@ -192,7 +189,6 @@ public abstract class AWRadioPopupStateHelper {
               return true;
             }
           } else {
-
             return false;
           }
         }
@@ -229,7 +225,6 @@ public abstract class AWRadioPopupStateHelper {
 
       if IsDefined(itemRecord)
         && Equals(itemRecord.Index(), activeIndex) {
-
         AWRadioPopupStateHelper.SetNumericProperty(
           controller,
           n"startupIndex",
@@ -247,7 +242,6 @@ public abstract class AWRadioPopupStateHelper {
 
       i += 1;
     }
-
   }
   public static func CaptureSelectedRecord(
     controller: ref<VehicleRadioPopupGameController>
@@ -272,7 +266,6 @@ public abstract class AWRadioPopupStateHelper {
     );
 
     if startupIndex >= ArraySize(stations) {
-
       return;
     }
 
@@ -281,7 +274,6 @@ public abstract class AWRadioPopupStateHelper {
     );
 
     if !IsDefined(record) {
-
       return;
     }
 
@@ -291,15 +283,12 @@ public abstract class AWRadioPopupStateHelper {
       && service.HasActivePlayback()
       && service.IsPlaybackPaused() {
       state.SetActiveRecordIndex(-1);
-
     } else {
       state.SetActiveRecordIndex(
         record.Index()
       );
     }
-
   }
-
 }
 
 @wrapMethod(VehicleRadioPopupGameController)

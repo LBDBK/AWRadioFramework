@@ -27,7 +27,6 @@ public class AWRadioTrackControlListener {
     eventClass = Reflection.GetClassOf(owner, true);
 
     if !IsDefined(eventClass) {
-
       return false;
     }
 
@@ -36,14 +35,12 @@ public class AWRadioTrackControlListener {
     );
 
     if !IsDefined(notificationTypeProperty) {
-
       return false;
     }
 
     titleProperty = eventClass.GetProperty(n"title");
 
     if !IsDefined(titleProperty) {
-
       return false;
     }
 
@@ -72,7 +69,6 @@ public class AWRadioTrackControlListener {
     event = new UIInGameNotificationEvent();
 
     if !this.ConfigureGenericNotification(event, message) {
-
       return;
     }
 

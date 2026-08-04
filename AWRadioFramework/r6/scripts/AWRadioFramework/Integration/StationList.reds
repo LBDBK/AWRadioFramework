@@ -148,26 +148,22 @@ public abstract class AWRadioStationListHelper {
     let recordProperty: ref<ReflectionProp>;
 
     if !IsDefined(record) {
-
       return null;
     }
 
     if !IsDefined(itemClass) {
-
       return null;
     }
 
     item = itemClass.MakeHandle();
 
     if !IsDefined(item) {
-
       return null;
     }
 
     recordProperty = itemClass.GetProperty(n"record");
 
     if !IsDefined(recordProperty) {
-
       return null;
     }
 
@@ -184,12 +180,10 @@ public abstract class AWRadioStationListHelper {
     );
 
     if !IsDefined(assignedRecord) {
-
       return null;
     }
 
     if NotEquals(assignedRecord.GetID(), record.GetID()) {
-
       return null;
     }
 
@@ -210,14 +204,12 @@ public static func GetRadioStations(
   let i = 0;
 
   if !IsDefined(service) {
-
     return result;
   }
 
   definitions = service.GetStations();
 
   if Equals(ArraySize(definitions), 0) {
-
     return result;
   }
 

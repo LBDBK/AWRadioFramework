@@ -60,7 +60,6 @@ public class AWRadioSavedStationSystem extends ScriptableSystem {
       this,
       n"OnSessionBeforeEnd"
     );
-
   }
 
   private func OnDetach() -> Void {
@@ -90,7 +89,6 @@ public class AWRadioSavedStationSystem extends ScriptableSystem {
         this.m_generation
       );
     }
-
   }
 
   private cb func OnSessionBeforeEnd(
@@ -99,7 +97,6 @@ public class AWRadioSavedStationSystem extends ScriptableSystem {
     this.m_sessionReady = false;
     this.m_restorePending = false;
     this.m_generation += 1;
-
   }
 
   public func RecordCustomRadioEvent(
@@ -136,13 +133,11 @@ public class AWRadioSavedStationSystem extends ScriptableSystem {
       this.m_restorePending = false;
       this.m_generation += 1;
     }
-
   }
 
   public func RecordNativeRadioEvent(
     toggle: Bool,
-    setStation: Bool,
-    stationIndex: Int32
+    setStation: Bool
   ) -> Void {
     if !toggle || !setStation {
       return;
@@ -185,8 +180,7 @@ public class AWRadioSavedStationSystem extends ScriptableSystem {
 
   private func RetryRestore(
     attempt: Int32,
-    generation: Int32,
-    reason: String
+    generation: Int32
   ) -> Bool {
     if attempt < 4 {
       this.ScheduleRestore(
@@ -222,8 +216,7 @@ public class AWRadioSavedStationSystem extends ScriptableSystem {
     if !IsDefined(saveCurrentStation) {
       return this.RetryRestore(
         attempt,
-        generation,
-        "setting-unavailable"
+        generation
       );
     }
 
@@ -240,8 +233,7 @@ public class AWRadioSavedStationSystem extends ScriptableSystem {
       || !service.IsCustomStation(stationIndex) {
       return this.RetryRestore(
         attempt,
-        generation,
-        "runtime-unavailable"
+        generation
       );
     }
 
@@ -251,7 +243,7 @@ public class AWRadioSavedStationSystem extends ScriptableSystem {
         stationIndex
       ) {
       this.m_restorePending = false;
-      this.m_wasPlaying = true;
+      this.m_wasPlaying = service.IsPlaybackRunning();
 
       return true;
     }
@@ -261,8 +253,7 @@ public class AWRadioSavedStationSystem extends ScriptableSystem {
     if !IsDefined(quickSlotsManager) {
       return this.RetryRestore(
         attempt,
-        generation,
-        "quick-slots-unavailable"
+        generation
       );
     }
 
@@ -291,13 +282,12 @@ public class AWRadioSavedStationSystem extends ScriptableSystem {
       ) {
       return this.RetryRestore(
         attempt,
-        generation,
-        "playback-did-not-start"
+        generation
       );
     }
 
     this.m_restorePending = false;
-    this.m_wasPlaying = true;
+    this.m_wasPlaying = service.IsPlaybackRunning();
 
     AWRadioMusicDuckBridge.SetRadioPlaying(
       service.IsPlaybackRunning(),
