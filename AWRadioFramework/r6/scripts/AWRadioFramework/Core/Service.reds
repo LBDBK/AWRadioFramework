@@ -129,6 +129,22 @@ public class AWRadioService extends ScriptableService {
   private let m_conversationPhoneCallRestricted: Bool;
   private let m_conversationSceneTierRestricted: Bool;
   private let m_nativePocketRadioRestricted: Bool;
+  private let m_autodriveEnabled: Bool;
+  private let m_cinematicCameraActive: Bool;
+  private let m_delamainTaxiActive: Bool;
+  private let m_autodriveReleasePending: Bool;
+  private let m_restrictionSceneTier: Bool;
+  private let m_restrictionUpperBodyState: Bool;
+  private let m_restrictionQuestContentLock: Bool;
+  private let m_restrictionInDaClub: Bool;
+  private let m_restrictionBlockFastTravel: Bool;
+  private let m_restrictionVehicleScene: Bool;
+  private let m_restrictionVehicleBlockPocketRadio: Bool;
+  private let m_restrictionPhoneCall: Bool;
+  private let m_restrictionPhoneNoTexting: Bool;
+  private let m_restrictionPhoneNoCalling: Bool;
+  private let m_restrictionFastForward: Bool;
+  private let m_restrictionFastForwardHintActive: Bool;
   private let m_conversationReleasePending: Bool;
   private let m_conversationMuted: Bool;
   private let m_audioCombatMixActive: Bool;
@@ -532,7 +548,6 @@ public class AWRadioService extends ScriptableService {
     return changed;
   }
 
-
   public func ReleaseForNativeRadio() -> Void {
     if IsDefined(this.m_activeStation) {
       this.Stop();
@@ -572,6 +587,10 @@ public class AWRadioService extends ScriptableService {
     return this.m_isPaused;
   }
 
+  public func IsRadioControlRestricted() -> Bool {
+    return this.m_conversationMuted;
+  }
+
   public func IsRepeatCurrentTrackEnabled() -> Bool {
     return this.m_repeatCurrentTrack;
   }
@@ -602,6 +621,150 @@ public class AWRadioService extends ScriptableService {
     }
 
     return true;
+  }
+
+  public func SetPocketRadioRestrictionState(
+    restriction: PocketRadioRestrictions,
+    restricted: Bool
+  ) -> Void {
+    let value = EnumInt(restriction);
+
+    if Equals(value, 0) {
+      this.m_restrictionSceneTier = restricted;
+    } else {
+      if Equals(value, 1) {
+        this.m_restrictionUpperBodyState = restricted;
+      } else {
+        if Equals(value, 2) {
+          this.m_restrictionQuestContentLock = restricted;
+        } else {
+          if Equals(value, 3) {
+            this.m_restrictionInDaClub = restricted;
+          } else {
+            if Equals(value, 4) {
+              this.m_restrictionBlockFastTravel = restricted;
+            } else {
+              if Equals(value, 5) {
+                this.m_restrictionVehicleScene = restricted;
+              } else {
+                if Equals(value, 6) {
+                  this.m_restrictionVehicleBlockPocketRadio = restricted;
+                } else {
+                  if Equals(value, 7) {
+                    this.m_restrictionPhoneCall = restricted;
+                  } else {
+                    if Equals(value, 8) {
+                      this.m_restrictionPhoneNoTexting = restricted;
+                    } else {
+                      if Equals(value, 9) {
+                        this.m_restrictionPhoneNoCalling = restricted;
+                      } else {
+                        if Equals(value, 10) {
+                          this.m_restrictionFastForward = restricted;
+                        } else {
+                          if Equals(value, 11) {
+                            this.m_restrictionFastForwardHintActive = restricted;
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    this.RefreshConversationMute(
+      n"pocket-radio-restriction-detail"
+    );
+  }
+
+  public func SetAutonomousRideState(
+    autodriveEnabled: Bool,
+    cinematicCameraActive: Bool,
+    delamainTaxiActive: Bool,
+    source: CName
+  ) -> Void {
+    let wasAutodriveEnabled = this.m_autodriveEnabled;
+    let wasDelamainTaxiActive = this.m_delamainTaxiActive;
+
+    if Equals(this.m_autodriveEnabled, autodriveEnabled)
+      && Equals(this.m_cinematicCameraActive, cinematicCameraActive)
+      && Equals(this.m_delamainTaxiActive, delamainTaxiActive) {
+      return;
+    }
+
+    if autodriveEnabled || delamainTaxiActive {
+      this.m_autodriveReleasePending = false;
+    } else {
+      if wasAutodriveEnabled
+        && !wasDelamainTaxiActive
+        && this.m_nativePocketRadioRestricted {
+        this.m_autodriveReleasePending = true;
+      }
+    }
+
+    this.m_autodriveEnabled = autodriveEnabled;
+    this.m_cinematicCameraActive = cinematicCameraActive;
+    this.m_delamainTaxiActive = delamainTaxiActive;
+
+    this.RefreshConversationMute(source);
+  }
+
+  private func HasAnyTrackedPocketRadioRestriction() -> Bool {
+    return this.m_restrictionSceneTier
+      || this.m_restrictionUpperBodyState
+      || this.m_restrictionQuestContentLock
+      || this.m_restrictionInDaClub
+      || this.m_restrictionBlockFastTravel
+      || this.m_restrictionVehicleScene
+      || this.m_restrictionVehicleBlockPocketRadio
+      || this.m_restrictionPhoneCall
+      || this.m_restrictionPhoneNoTexting
+      || this.m_restrictionPhoneNoCalling
+      || this.m_restrictionFastForward
+      || this.m_restrictionFastForwardHintActive;
+  }
+
+  private func HasBlockingAutonomousRestriction() -> Bool {
+    if this.m_restrictionSceneTier
+      || this.m_restrictionInDaClub
+      || this.m_restrictionBlockFastTravel
+      || this.m_restrictionVehicleScene
+      || this.m_restrictionVehicleBlockPocketRadio
+      || this.m_restrictionPhoneCall
+      || this.m_restrictionPhoneNoTexting
+      || this.m_restrictionFastForward {
+      return true;
+    }
+
+    if this.m_delamainTaxiActive {
+      return false;
+    }
+
+    return this.m_restrictionPhoneNoCalling
+      || this.m_restrictionFastForwardHintActive;
+  }
+
+  public func IsEffectiveNativePocketRadioRestricted() -> Bool {
+    if !this.m_nativePocketRadioRestricted {
+      return false;
+    }
+
+    if !this.m_autodriveEnabled
+      && !this.m_delamainTaxiActive
+      && !this.m_autodriveReleasePending {
+      return true;
+    }
+
+    if !this.HasAnyTrackedPocketRadioRestriction() {
+      return !this.m_autodriveReleasePending;
+    }
+
+    return this.HasBlockingAutonomousRestriction();
   }
 
   public func SetPhoneCallConversationRestricted(
@@ -649,10 +812,18 @@ public class AWRadioService extends ScriptableService {
   public func SetNativePocketRadioRestricted(
     restricted: Bool
   ) -> Void {
+    if !restricted {
+      this.m_autodriveReleasePending = false;
+    }
+
     if Equals(
       this.m_nativePocketRadioRestricted,
       restricted
     ) {
+      this.RefreshConversationMute(
+        n"native-pocket-radio-restriction"
+      );
+
       return;
     }
 
@@ -831,7 +1002,7 @@ public class AWRadioService extends ScriptableService {
     let shouldMute =
       this.m_conversationPhoneCallRestricted
       || this.m_conversationSceneTierRestricted
-      || this.m_nativePocketRadioRestricted
+      || this.IsEffectiveNativePocketRadioRestricted()
       || this.m_conversationReleasePending;
 
     if Equals(shouldMute, this.m_conversationMuted) {
@@ -840,6 +1011,7 @@ public class AWRadioService extends ScriptableService {
 
     this.m_conversationMuted = shouldMute;
     this.ApplyActiveVolume(source);
+
   }
 
   public func MuteForLoadingScreen() -> Bool {
@@ -1509,6 +1681,22 @@ public class AWRadioService extends ScriptableService {
     this.m_conversationPhoneCallRestricted = false;
     this.m_conversationSceneTierRestricted = false;
     this.m_nativePocketRadioRestricted = false;
+    this.m_autodriveEnabled = false;
+    this.m_cinematicCameraActive = false;
+    this.m_delamainTaxiActive = false;
+    this.m_autodriveReleasePending = false;
+    this.m_restrictionSceneTier = false;
+    this.m_restrictionUpperBodyState = false;
+    this.m_restrictionQuestContentLock = false;
+    this.m_restrictionInDaClub = false;
+    this.m_restrictionBlockFastTravel = false;
+    this.m_restrictionVehicleScene = false;
+    this.m_restrictionVehicleBlockPocketRadio = false;
+    this.m_restrictionPhoneCall = false;
+    this.m_restrictionPhoneNoTexting = false;
+    this.m_restrictionPhoneNoCalling = false;
+    this.m_restrictionFastForward = false;
+    this.m_restrictionFastForwardHintActive = false;
     this.m_conversationReleasePending = false;
     this.m_conversationMuted = false;
   }
@@ -1523,7 +1711,6 @@ public class AWRadioService extends ScriptableService {
   private func ResetTrackControlState() -> Void {
     this.m_repeatCurrentTrack = false;
   }
-
 
   private func ResetContextPlaybackState() -> Void {
     this.m_onFootPlaybackEnabled = false;
