@@ -29,6 +29,8 @@ public final func SendRadioEvent(
   station: Int32
 ) -> Void {
   let activeIndex: Int32;
+  let mounted: Bool;
+  let player: wref<PlayerPuppet>;
   let savedStationState = AWRadioSavedStationSystem.Get();
   let selectedRowState = AWRadioSelectedRowService.Get();
   let service = AWRadioService.Get();
@@ -60,7 +62,9 @@ public final func SendRadioEvent(
         wrappedMethod(false, false, -1);
       }
 
-      if !toggle || NotEquals(activeIndex, station) {
+      if !service.IsSyncToVehicleEnabled()
+        || !toggle
+        || NotEquals(activeIndex, station) {
         AWRadioPocketStateBridge.QueueState(
           toggle,
           setStation,
@@ -69,6 +73,20 @@ public final func SendRadioEvent(
       }
 
       if service.HandleRadioEvent(toggle, setStation, station) {
+        if !service.IsSyncToVehicleEnabled() {
+          player = GetPlayer(GetGameInstance());
+          mounted = IsDefined(player)
+            && IsDefined(GetMountedVehicle(player));
+
+          AWRadioPlaybackUIBridge.Sync(service);
+
+          AWRadioVehicleTransitionBridge.ScheduleContextUIRefresh(
+            0.10,
+            mounted,
+            n"custom-selection-ui-100ms"
+          );
+        }
+
         if IsDefined(selectedRowState) {
           selectedRowState.ScheduleRefresh();
         }

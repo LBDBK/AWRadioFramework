@@ -200,6 +200,7 @@ public abstract class AWRadioSelectedRowUI {
     let controllerClass: ref<ReflectionClass>;
     let equalizerSet: Bool;
     let record: wref<RadioStation_Record>;
+    let service = AWRadioService.Get();
 
     if !IsDefined(controller) || !IsDefined(state) {
       return;
@@ -213,7 +214,6 @@ public abstract class AWRadioSelectedRowUI {
       return;
     }
 
-    activeRecordIndex = state.GetActiveRecordIndex();
     record = AWRadioSelectedRowUI.GetRecord(
       controller,
       controllerClass
@@ -222,6 +222,57 @@ public abstract class AWRadioSelectedRowUI {
     if !IsDefined(record) {
       return;
     }
+
+    if IsDefined(service)
+      && service.HasActivePlayback() {
+      activeRecordIndex = -1;
+
+      if service.IsPlaybackRunning() {
+        activeRecordIndex = service.GetActiveStationIndex();
+      }
+
+      if Equals(record.Index(), activeRecordIndex) {
+        equalizerSet = AWRadioSelectedRowUI.SetWidgetState(
+          controller,
+          controllerClass,
+          n"equilizerIcon",
+          true
+        );
+
+        codeSet = AWRadioSelectedRowUI.SetWidgetState(
+          controller,
+          controllerClass,
+          n"codeTLicon",
+          false
+        );
+
+        if equalizerSet && codeSet {
+          state.MarkForcedController(controller);
+        }
+      } else {
+        AWRadioSelectedRowUI.SetWidgetState(
+          controller,
+          controllerClass,
+          n"equilizerIcon",
+          false
+        );
+
+        AWRadioSelectedRowUI.SetWidgetState(
+          controller,
+          controllerClass,
+          n"codeTLicon",
+          true
+        );
+
+        if state.IsForcedController(controller) {
+          state.ClearForcedController(controller);
+        }
+      }
+
+      return;
+    }
+
+    activeRecordIndex = state.GetActiveRecordIndex();
 
     if activeRecordIndex < 0 {
       if state.IsForcedController(controller) {

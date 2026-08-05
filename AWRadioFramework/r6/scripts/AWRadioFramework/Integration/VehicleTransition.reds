@@ -48,6 +48,30 @@ public class AWRadioUnmountRestoreCallback extends DelayCallback {
   }
 }
 
+public class AWRadioContextUIRefreshCallback extends DelayCallback {
+  private let m_expectedMounted: Bool;
+  private let m_source: CName;
+
+  public static func Create(
+    expectedMounted: Bool,
+    source: CName
+  ) -> ref<AWRadioContextUIRefreshCallback> {
+    let callback = new AWRadioContextUIRefreshCallback();
+
+    callback.m_expectedMounted = expectedMounted;
+    callback.m_source = source;
+
+    return callback;
+  }
+
+  public func Call() -> Void {
+    AWRadioVehicleTransitionBridge.RefreshContextUI(
+      this.m_expectedMounted,
+      this.m_source
+    );
+  }
+}
+
 public abstract class AWRadioVehicleTransitionBridge {
   private static func SetNumericProperty(
     target: ref<IScriptable>,
@@ -326,6 +350,101 @@ public abstract class AWRadioVehicleTransitionBridge {
     return true;
   }
 
+  public static func SyncPocketCustomState(
+    shouldPlay: Bool,
+    source: CName
+  ) -> Bool {
+    let player = GetPlayer(GetGameInstance());
+    let service = AWRadioService.Get();
+
+    if !IsDefined(player)
+      || !IsDefined(service)
+      || !service.HasActivePlayback() {
+      return false;
+    }
+
+    service.RefreshActiveVolume(source);
+
+    AWRadioPocketStateBridge.QueueState(
+      false,
+      false,
+      -1
+    );
+
+    AWRadioPocketStateBridge.QueueState(
+      shouldPlay,
+      true,
+      service.GetActiveStationIndex()
+    );
+
+    AWRadioPlaybackUIBridge.Sync(service);
+
+    GameInstance
+      .GetUISystem(GetGameInstance())
+      .QueueEvent(
+        new VehicleRadioSongChanged()
+      );
+
+    return true;
+  }
+
+  public static func RefreshContextUI(
+    expectedMounted: Bool,
+    source: CName
+  ) -> Bool {
+    let mounted: Bool;
+    let player = GetPlayer(GetGameInstance());
+    let service = AWRadioService.Get();
+
+    if !IsDefined(player)
+      || !IsDefined(service)
+      || !service.HasActivePlayback() {
+      return false;
+    }
+
+    mounted = IsDefined(GetMountedVehicle(player));
+
+    if NotEquals(mounted, expectedMounted) {
+      return false;
+    }
+
+    if mounted {
+      AWRadioVehicleTransitionBridge.SyncMountedState(
+        service.IsPlaybackRunning(),
+        source
+      );
+    }
+
+    AWRadioPlaybackUIBridge.Sync(service);
+
+    GameInstance
+      .GetUISystem(GetGameInstance())
+      .QueueEvent(
+        new VehicleRadioSongChanged()
+      );
+
+    return true;
+  }
+
+  public static func ScheduleContextUIRefresh(
+    delay: Float,
+    expectedMounted: Bool,
+    source: CName
+  ) -> Void {
+    let callback = AWRadioContextUIRefreshCallback.Create(
+      expectedMounted,
+      source
+    );
+
+    GameInstance
+      .GetDelaySystem(GetGameInstance())
+      .DelayCallback(
+        callback,
+        delay,
+        false
+      );
+  }
+
   public static func SchedulePocketRestore(
     delay: Float,
     source: CName
@@ -368,23 +487,64 @@ protected func OnEnter(
 
   if IsDefined(service)
     && service.HasActivePlayback() {
-    AWRadioVehicleTransitionBridge
-      .ScheduleMountedStateSync(
-        0.05,
-        n"mount-50ms"
+    if service.IsSyncToVehicleEnabled() {
+      AWRadioVehicleTransitionBridge
+        .ScheduleMountedStateSync(
+          0.05,
+          n"mount-50ms"
+        );
+
+      AWRadioVehicleTransitionBridge
+        .ScheduleMountedStateSync(
+          0.10,
+          n"mount-100ms"
+        );
+
+      AWRadioVehicleTransitionBridge
+        .ScheduleMountedStateSync(
+          0.50,
+          n"mount-500ms"
+        );
+    } else {
+      service.InitializeVehiclePlaybackFromOnFoot(
+        n"vehicle-mount-initialize"
       );
 
-    AWRadioVehicleTransitionBridge
-      .ScheduleMountedStateSync(
+      service.ApplyPlaybackStateForContext(
+        true,
+        n"vehicle-mount-apply"
+      );
+
+      AWRadioVehicleTransitionBridge.SyncMountedState(
+        service.IsPlaybackRunning(),
+        n"vehicle-mount-immediate"
+      );
+
+      AWRadioVehicleTransitionBridge.ScheduleContextUIRefresh(
         0.10,
-        n"mount-100ms"
+        true,
+        n"vehicle-mount-ui-100ms"
       );
 
-    AWRadioVehicleTransitionBridge
-      .ScheduleMountedStateSync(
-        0.50,
-        n"mount-500ms"
+      AWRadioVehicleTransitionBridge.ScheduleContextUIRefresh(
+        0.35,
+        true,
+        n"vehicle-mount-ui-350ms"
       );
+
+      AWRadioPlaybackUIBridge.Sync(service);
+
+      GameInstance
+        .GetUISystem(GetGameInstance())
+        .QueueEvent(
+          new VehicleRadioSongChanged()
+        );
+
+      AWRadioMusicDuckBridge.SetRadioPlaying(
+        service.IsPlaybackRunning(),
+        n"vehicle-mount-custom"
+      );
+    }
   }
 }
 
@@ -402,6 +562,7 @@ private func HandleVehicleRadioStationChanged(
 private func HandleVehicleUnmounted(
   vehicle: wref<VehicleObject>
 ) -> Void {
+  let onFootShouldPlay: Bool;
   let service = AWRadioService.Get();
 
   if IsDefined(service)
@@ -418,21 +579,47 @@ private func HandleVehicleUnmounted(
       vehicle.ToggleRadioReceiver(false);
     }
 
-    AWRadioVehicleTransitionBridge.RestorePocketState(
-      n"unmount-immediate"
-    );
-
-    AWRadioVehicleTransitionBridge
-      .SchedulePocketRestore(
-        0.05,
-        n"unmount-50ms"
+    if service.IsSyncToVehicleEnabled() {
+      AWRadioVehicleTransitionBridge.RestorePocketState(
+        n"unmount-immediate"
       );
 
-    AWRadioVehicleTransitionBridge
-      .SchedulePocketRestore(
+      AWRadioVehicleTransitionBridge
+        .SchedulePocketRestore(
+          0.05,
+          n"unmount-50ms"
+        );
+
+      AWRadioVehicleTransitionBridge
+        .SchedulePocketRestore(
+          0.10,
+          n"unmount-100ms"
+        );
+    } else {
+      onFootShouldPlay = service.IsOnFootPlaybackEnabled();
+
+      service.ApplyPlaybackStateForContext(
+        false,
+        n"vehicle-unmount-apply"
+      );
+
+      AWRadioVehicleTransitionBridge.SyncPocketCustomState(
+        onFootShouldPlay,
+        n"vehicle-unmount-pocket"
+      );
+
+      AWRadioVehicleTransitionBridge.ScheduleContextUIRefresh(
         0.10,
-        n"unmount-100ms"
+        false,
+        n"vehicle-unmount-ui-100ms"
       );
+
+      AWRadioVehicleTransitionBridge.ScheduleContextUIRefresh(
+        0.35,
+        false,
+        n"vehicle-unmount-ui-350ms"
+      );
+    }
 
     AWRadioMusicDuckBridge.SetRadioPlaying(
       service.IsPlaybackRunning(),
@@ -479,10 +666,20 @@ private func HandleVehicleRadioEvent(
       n"vehicle-radio-event"
     );
 
-    AWRadioVehicleTransitionBridge
-      .ScheduleMountedStateSync(
+    if service.IsSyncToVehicleEnabled() {
+      AWRadioVehicleTransitionBridge
+        .ScheduleMountedStateSync(
+          0.10,
+          n"selection-100ms"
+        );
+    } else {
+      AWRadioPlaybackUIBridge.Sync(service);
+
+      AWRadioVehicleTransitionBridge.ScheduleContextUIRefresh(
         0.10,
-        n"selection-100ms"
+        true,
+        n"vehicle-radio-event-ui-100ms"
       );
+    }
   }
 }
