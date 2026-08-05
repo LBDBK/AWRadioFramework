@@ -7,15 +7,7 @@
     <action name="AWRadioToggleRepeatSongController" map="AWRadioToggleRepeatSongController_Button" />
   </context>
 
-  <context name="Exploration" append="true">
-    <include name="AWRadioFrameworkTrackControls" />
-  </context>
-
-  <context name="VehicleDriveBase" append="true">
-    <include name="AWRadioFrameworkTrackControls" />
-  </context>
-
-  <context name="VehiclePassenger" append="true">
+  <context name="UIExploration" append="true">
     <include name="AWRadioFrameworkTrackControls" />
   </context>
 
