@@ -6,7 +6,6 @@
     <action name="AWRadioSkipSongController" map="AWRadioSkipSongController_Button" />
     <action name="AWRadioToggleRepeatSongController" map="AWRadioToggleRepeatSongController_Button" />
   </context>
-
   <context name="UIExploration" append="true">
     <include name="AWRadioFrameworkTrackControls" />
   </context>
@@ -20,7 +19,6 @@
   <mapping name="AWRadioSkipSong_Button" type="Button">
     <button id="IK_L" overridableUI="AWRadioSkipSongKey" />
   </mapping>
-
   <mapping name="AWRadioToggleRepeatSong_Button" type="Button">
     <button id="IK_U" overridableUI="AWRadioRepeatSongKey" />
   </mapping>
