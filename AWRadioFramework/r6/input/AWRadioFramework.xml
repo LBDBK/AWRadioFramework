@@ -3,6 +3,8 @@
   <context name="AWRadioFrameworkTrackControls">
     <action name="AWRadioSkipSong" map="AWRadioSkipSong_Button" />
     <action name="AWRadioToggleRepeatSong" map="AWRadioToggleRepeatSong_Button" />
+    <action name="AWRadioSkipSongController" map="AWRadioSkipSongController_Button" />
+    <action name="AWRadioToggleRepeatSongController" map="AWRadioToggleRepeatSongController_Button" />
   </context>
 
   <context name="Exploration" append="true">
@@ -17,11 +19,25 @@
     <include name="AWRadioFrameworkTrackControls" />
   </context>
 
+  <hold action="AWRadioSkipSongController" timeout="0.3" />
+
+  <acceptedEvents action="AWRadioSkipSongController">
+    <event name="BUTTON_HOLD_COMPLETE" />
+  </acceptedEvents>
+
   <mapping name="AWRadioSkipSong_Button" type="Button">
     <button id="IK_L" overridableUI="AWRadioSkipSongKey" />
   </mapping>
 
   <mapping name="AWRadioToggleRepeatSong_Button" type="Button">
     <button id="IK_U" overridableUI="AWRadioRepeatSongKey" />
+  </mapping>
+
+  <mapping name="AWRadioSkipSongController_Button" type="Button">
+    <button id="IK_Pad_LeftShoulder" overridableUI="AWRadioSkipSongControllerKey" />
+  </mapping>
+
+  <mapping name="AWRadioToggleRepeatSongController_Button" type="Button">
+    <button id="IK_Pad_DigitLeft" overridableUI="AWRadioRepeatSongControllerKey" />
   </mapping>
 </bindings>
