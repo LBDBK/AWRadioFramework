@@ -1,5 +1,32 @@
 module AWRadioFramework
 
+public abstract class AWRadioRestrictionBridge {
+  public static func Sync(
+    service: ref<AWRadioService>,
+    nativeRestricted: Bool,
+    source: CName
+  ) -> Void {
+    if !IsDefined(service) {
+      AWRadioMusicDuckBridge.SetRestrictionSuspended(
+        nativeRestricted,
+        source
+      );
+
+      return;
+    }
+
+    service.SetNativePocketRadioRestricted(nativeRestricted);
+    service.SyncConversationNativeAvailability(
+      service.IsEffectiveNativePocketRadioRestricted()
+    );
+
+    AWRadioMusicDuckBridge.SetRestrictionSuspended(
+      service.IsRadioControlRestricted(),
+      source
+    );
+  }
+}
+
 @wrapMethod(PocketRadio)
 public func HandleRestriction(
   restriction: PocketRadioRestrictions,
@@ -12,31 +39,41 @@ public func HandleRestriction(
   let service = AWRadioService.Get();
 
   if restricted && IsDefined(service) {
-    if isPhoneCall {
-      service.SetPhoneCallConversationRestricted(true);
-    }
-
-    if isSceneTier {
-      service.SetSceneTierConversationRestricted(true);
-    }
+    service.SetPocketRadioRestrictionState(
+      restriction,
+      true
+    );
   }
 
   wrappedMethod(restriction, restricted);
 
-  if !restricted && IsDefined(service) {
+  if IsDefined(service) {
+    if !restricted {
+      service.SetPocketRadioRestrictionState(
+        restriction,
+        false
+      );
+    }
+
     if isPhoneCall {
-      service.SetPhoneCallConversationRestricted(false);
+      service.SetPhoneCallConversationRestricted(
+        restricted && this.IsRestricted()
+      );
     }
 
     if isSceneTier {
-      service.SetSceneTierConversationRestricted(false);
+      service.SetSceneTierConversationRestricted(
+        restricted && this.IsRestricted()
+      );
     }
   }
 
-  AWRadioMusicDuckBridge.SetRestrictionSuspended(
+  AWRadioRestrictionBridge.Sync(
+    service,
     this.IsRestricted(),
     n"pocket-radio-restriction"
   );
+
 }
 
 @wrapMethod(PocketRadio)
@@ -45,18 +82,10 @@ public func HandleRestrictionStateChanged() -> Void {
 
   wrappedMethod();
 
-  if IsDefined(service) {
-    service.SetNativePocketRadioRestricted(
-      this.IsRestricted()
-    );
-
-    service.SyncConversationNativeAvailability(
-      this.IsRestricted()
-    );
-  }
-
-  AWRadioMusicDuckBridge.SetRestrictionSuspended(
+  AWRadioRestrictionBridge.Sync(
+    service,
     this.IsRestricted(),
     n"pocket-radio-restriction-state"
   );
+
 }

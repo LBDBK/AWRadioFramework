@@ -85,10 +85,12 @@ public class AWRadioTrackControlListener {
     let controllerAction: Bool;
     let nativeSkip: ref<AWNativeRadioSkipService>;
     let nativeTrackTitle: String;
+    let result: Bool;
     let service: ref<AWRadioService>;
     let settings: ref<AWRadioFrameworkSettings>;
 
     actionName = ListenerAction.GetName(action);
+
     controllerAction = Equals(
       actionName,
       n"AWRadioSkipSongController"
@@ -135,9 +137,15 @@ public class AWRadioTrackControlListener {
       return false;
     }
 
+    if service.IsRadioControlRestricted() {
+      return false;
+    }
+
     if Equals(actionName, n"AWRadioSkipSong") {
       if service.HasActivePlayback() {
-        if !service.SkipCurrentTrack(n"input-loader") {
+        result = service.SkipCurrentTrack(n"input-loader");
+
+        if !result {
           return false;
         }
 
@@ -150,8 +158,13 @@ public class AWRadioTrackControlListener {
 
       nativeSkip = AWNativeRadioSkipService.Get();
 
-      if !IsDefined(nativeSkip)
-        || !nativeSkip.TrySkip(this.m_player) {
+      if !IsDefined(nativeSkip) {
+        result = false;
+      } else {
+        result = nativeSkip.TrySkip(this.m_player);
+      }
+
+      if !result {
         return false;
       }
 
@@ -169,8 +182,9 @@ public class AWRadioTrackControlListener {
       return true;
     }
 
+    result = service.ToggleRepeatCurrentTrack(n"input-loader");
 
-    if !service.ToggleRepeatCurrentTrack(n"input-loader") {
+    if !result {
       return false;
     }
 
