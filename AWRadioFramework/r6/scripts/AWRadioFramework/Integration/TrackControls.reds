@@ -82,19 +82,47 @@ public class AWRadioTrackControlListener {
     consumer: ListenerActionConsumer
   ) -> Bool {
     let actionName: CName;
+    let controllerAction: Bool;
     let nativeSkip: ref<AWNativeRadioSkipService>;
     let nativeTrackTitle: String;
     let service: ref<AWRadioService>;
-
-    if !ListenerAction.IsButtonJustReleased(action) {
-      return false;
-    }
+    let settings: ref<AWRadioFrameworkSettings>;
 
     actionName = ListenerAction.GetName(action);
+    controllerAction = Equals(
+      actionName,
+      n"AWRadioSkipSongController"
+    ) || Equals(
+      actionName,
+      n"AWRadioToggleRepeatSongController"
+    );
 
-    if !Equals(actionName, n"AWRadioSkipSong")
-      && !Equals(actionName, n"AWRadioToggleRepeatSong") {
-      return false;
+    if controllerAction {
+      settings = AWRadioFrameworkSettings.Get();
+
+      if !IsDefined(settings)
+        || !settings.AreControllerGamepadBindingsEnabled() {
+        return false;
+      }
+
+      if Equals(actionName, n"AWRadioSkipSongController") {
+        actionName = n"AWRadioSkipSong";
+      } else {
+        if !ListenerAction.IsButtonJustReleased(action) {
+          return false;
+        }
+
+        actionName = n"AWRadioToggleRepeatSong";
+      }
+    } else {
+      if !ListenerAction.IsButtonJustReleased(action) {
+        return false;
+      }
+
+      if !Equals(actionName, n"AWRadioSkipSong")
+        && !Equals(actionName, n"AWRadioToggleRepeatSong") {
+        return false;
+      }
     }
 
     if !IsDefined(this.m_player) {
@@ -180,6 +208,16 @@ protected cb func OnGameAttached() -> Bool {
   this.RegisterInputListener(
     listener,
     n"AWRadioToggleRepeatSong"
+  );
+
+  this.RegisterInputListener(
+    listener,
+    n"AWRadioSkipSongController"
+  );
+
+  this.RegisterInputListener(
+    listener,
+    n"AWRadioToggleRepeatSongController"
   );
 
   return result;
