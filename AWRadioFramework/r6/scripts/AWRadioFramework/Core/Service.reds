@@ -137,6 +137,9 @@ public class AWRadioService extends ScriptableService {
   private let m_combatMusicSuppressed: Bool;
   private let m_volumeFadeGeneration: Int32;
   private let m_outputVolume: Float;
+  private let m_onFootPlaybackEnabled: Bool;
+  private let m_vehiclePlaybackEnabled: Bool;
+  private let m_vehiclePlaybackInitialized: Bool;
 
   private let m_sharedRadioVolume: Float = 1.0;
 
@@ -147,6 +150,7 @@ public class AWRadioService extends ScriptableService {
   }
 
   private cb func OnLoad() -> Void {
+
     this.m_callbackSystem = GameInstance.GetCallbackSystem();
 
     this.m_callbackSystem.RegisterCallback(
@@ -169,6 +173,7 @@ public class AWRadioService extends ScriptableService {
     this.ResetConversationState();
     this.ResetCombatState();
     this.ResetPlaybackState();
+    this.ResetContextPlaybackState();
     this.ResetTrackControlState();
     this.SyncVolumeSettings();
   }
@@ -360,6 +365,7 @@ public class AWRadioService extends ScriptableService {
     setStation: Bool,
     stationIndex: Int32
   ) -> Bool {
+    let mounted = this.IsPlayerMounted();
     let station = this.FindStationByIndex(stationIndex);
 
     if !IsDefined(station) {
@@ -370,24 +376,162 @@ public class AWRadioService extends ScriptableService {
       return true;
     }
 
+    if this.IsSyncToVehicleEnabled() {
+      if !toggle {
+        this.Stop();
+        return true;
+      }
+
+      this.SetContextPlaybackEnabled(
+        mounted,
+        true,
+        n"radio-event-sync-enabled"
+      );
+
+      if IsDefined(this.m_activeStation)
+        && Equals(this.m_activeStation.index, station.index)
+        && NotEquals(this.m_currentEvent, n"") {
+        if this.m_isPaused {
+          this.ResumePlayback(n"radio-event");
+        }
+
+        return true;
+      }
+
+      this.StartStation(station);
+      return true;
+    }
+
+    this.SetContextPlaybackEnabled(
+      mounted,
+      toggle,
+      n"radio-event-intent"
+    );
+
     if !toggle {
-      this.Stop();
+      if IsDefined(this.m_activeStation)
+        && Equals(this.m_activeStation.index, station.index)
+        && NotEquals(this.m_currentEvent, n"") {
+        this.ApplyPlaybackStateForContext(
+          mounted,
+          n"radio-event-off"
+        );
+      }
+
       return true;
     }
 
     if IsDefined(this.m_activeStation)
       && Equals(this.m_activeStation.index, station.index)
       && NotEquals(this.m_currentEvent, n"") {
-      if this.m_isPaused {
-        this.ResumePlayback(n"radio-event");
-      }
+      this.ApplyPlaybackStateForContext(
+        mounted,
+        n"radio-event-on"
+      );
 
       return true;
     }
 
     this.StartStation(station);
+
     return true;
   }
+
+  private func IsPlayerMounted() -> Bool {
+    let player = GetPlayer(GetGameInstance());
+
+    return IsDefined(player)
+      && IsDefined(GetMountedVehicle(player));
+  }
+
+  public func IsSyncToVehicleEnabled() -> Bool {
+    let setting = GameInstance
+      .GetSettingsSystem(GetGameInstance())
+      .GetVar(
+        n"/gameplay/radioport",
+        n"radioport_sync_to_car"
+      ) as ConfigVarBool;
+
+    if !IsDefined(setting) {
+      return true;
+    }
+
+    return setting.GetValue();
+  }
+
+  public func IsOnFootPlaybackEnabled() -> Bool {
+    return this.m_onFootPlaybackEnabled;
+  }
+
+  public func IsVehiclePlaybackEnabled() -> Bool {
+    if !this.m_vehiclePlaybackInitialized {
+      return this.m_onFootPlaybackEnabled;
+    }
+
+    return this.m_vehiclePlaybackEnabled;
+  }
+
+  public func InitializeVehiclePlaybackFromOnFoot(
+    source: CName
+  ) -> Bool {
+    if !this.m_vehiclePlaybackInitialized {
+      this.m_vehiclePlaybackEnabled =
+        this.m_onFootPlaybackEnabled;
+      this.m_vehiclePlaybackInitialized = true;
+    }
+
+    return this.m_vehiclePlaybackEnabled;
+  }
+
+  public func SetContextPlaybackEnabled(
+    mounted: Bool,
+    enabled: Bool,
+    source: CName
+  ) -> Void {
+    if this.IsSyncToVehicleEnabled() {
+      this.m_onFootPlaybackEnabled = enabled;
+      this.m_vehiclePlaybackEnabled = enabled;
+      this.m_vehiclePlaybackInitialized = true;
+    } else {
+      if mounted {
+        this.m_vehiclePlaybackEnabled = enabled;
+        this.m_vehiclePlaybackInitialized = true;
+      } else {
+        this.m_onFootPlaybackEnabled = enabled;
+      }
+    }
+  }
+
+  public func ApplyPlaybackStateForContext(
+    mounted: Bool,
+    source: CName
+  ) -> Bool {
+    let changed = false;
+    let shouldPlay: Bool;
+
+    if !this.HasActivePlayback() {
+      return false;
+    }
+
+    if mounted {
+      shouldPlay = this.IsVehiclePlaybackEnabled();
+    } else {
+      shouldPlay = this.m_onFootPlaybackEnabled;
+    }
+
+    if shouldPlay {
+      if this.m_isPaused {
+        changed = this.ResumePlayback(source);
+      }
+    } else {
+      if !this.m_isPaused {
+        changed = this.PausePlayback(source);
+      }
+    }
+
+    return changed;
+  }
+
 
   public func ReleaseForNativeRadio() -> Void {
     if IsDefined(this.m_activeStation) {
@@ -1204,7 +1348,7 @@ public class AWRadioService extends ScriptableService {
   private func StartStation(
     station: ref<AWRadioStationDefinition>
   ) -> Void {
-    this.Stop();
+    this.StopInternal(false);
 
     this.m_activeStation = station;
     this.BuildShuffledTrackOrder(-1);
@@ -1340,6 +1484,12 @@ public class AWRadioService extends ScriptableService {
   }
 
   private func Stop() -> Void {
+    this.StopInternal(true);
+  }
+
+  private func StopInternal(
+    resetContext: Bool
+  ) -> Void {
     this.m_generation += 1;
 
     if IsDefined(this.m_currentSound) {
@@ -1349,6 +1499,10 @@ public class AWRadioService extends ScriptableService {
     }
 
     this.ResetPlaybackState();
+
+    if resetContext {
+      this.ResetContextPlaybackState();
+    }
   }
 
   private func ResetConversationState() -> Void {
@@ -1370,6 +1524,12 @@ public class AWRadioService extends ScriptableService {
     this.m_repeatCurrentTrack = false;
   }
 
+
+  private func ResetContextPlaybackState() -> Void {
+    this.m_onFootPlaybackEnabled = false;
+    this.m_vehiclePlaybackEnabled = false;
+    this.m_vehiclePlaybackInitialized = false;
+  }
   private func ResetPlaybackState() -> Void {
     this.m_activeStation = null;
     this.m_trackIndex = 0;

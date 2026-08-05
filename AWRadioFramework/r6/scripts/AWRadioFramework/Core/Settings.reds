@@ -12,7 +12,7 @@ public class AWRadioFrameworkSettings extends ScriptableSystem {
   @runtimeProperty("ModSettings.category", "AW Radio Settings")
   @runtimeProperty("ModSettings.category.order", "2")
   @runtimeProperty("ModSettings.displayName", "Skip Song")
-  @runtimeProperty("ModSettings.description", "Changes the Input Loader key used to skip the current AWRadioFramework track.")
+  @runtimeProperty("ModSettings.description", "Changes the Input Loader key used to skip the current AWRadioFramework track or native radio song.")
   public let AWRadioSkipSongKey: EInputKey = EInputKey.IK_L;
 
   @runtimeProperty("ModSettings.mod", "AW Radio Framework")
