@@ -6,28 +6,34 @@
     <action name="AWRadioSkipSongController" map="AWRadioSkipSongController_Button" />
     <action name="AWRadioToggleRepeatSongController" map="AWRadioToggleRepeatSongController_Button" />
   </context>
+
   <context name="UIExploration" append="true">
     <include name="AWRadioFrameworkTrackControls" />
   </context>
 
-  <hold action="AWRadioSkipSongController" timeout="0.3" />
-
-  <acceptedEvents action="AWRadioSkipSongController">
-    <event name="BUTTON_HOLD_COMPLETE" />
-  </acceptedEvents>
-
   <mapping name="AWRadioSkipSong_Button" type="Button">
     <button id="IK_L" overridableUI="AWRadioSkipSongKey" />
   </mapping>
+
   <mapping name="AWRadioToggleRepeatSong_Button" type="Button">
     <button id="IK_U" overridableUI="AWRadioRepeatSongKey" />
   </mapping>
 
   <mapping name="AWRadioSkipSongController_Button" type="Button">
-    <button id="IK_Pad_LeftShoulder" overridableUI="AWRadioSkipSongControllerKey" />
+    <button id="IK_AWRadioSkipControllerCombo" />
   </mapping>
 
   <mapping name="AWRadioToggleRepeatSongController_Button" type="Button">
-    <button id="IK_Pad_DigitLeft" overridableUI="AWRadioRepeatSongControllerKey" />
+    <button id="IK_AWRadioRepeatControllerCombo" />
   </mapping>
+
+  <buttonGroup id="IK_AWRadioSkipControllerCombo" timeWindow="0.08f">
+    <button id="IK_Pad_LeftShoulder" />
+    <button id="IK_Pad_DigitRight" />
+  </buttonGroup>
+
+  <buttonGroup id="IK_AWRadioRepeatControllerCombo" timeWindow="0.08f">
+    <button id="IK_Pad_LeftShoulder" />
+    <button id="IK_Pad_DigitLeft" />
+  </buttonGroup>
 </bindings>
