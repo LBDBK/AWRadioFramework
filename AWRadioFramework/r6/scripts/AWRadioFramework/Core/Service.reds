@@ -118,6 +118,10 @@ public class AWRadioService extends ScriptableService {
   private let m_repeatCurrentTrack: Bool;
   private let m_isPaused: Bool;
   private let m_manualPauseGeneration: Int32;
+  private let m_timeSkipMenuActive: Bool;
+  private let m_timeSkipMenuAutoPaused: Bool;
+  private let m_photoModeActive: Bool;
+  private let m_photoModeAutoPaused: Bool;
   private let m_pausedPosition: Float;
   private let m_playbackAnchor: Float;
   private let m_playbackStartedAt: Float;
@@ -587,8 +591,103 @@ public class AWRadioService extends ScriptableService {
     return this.m_isPaused;
   }
 
+  public func SetTimeSkipMenuActive(
+    active: Bool,
+    source: CName
+  ) -> Void {
+    if Equals(this.m_timeSkipMenuActive, active) {
+      return;
+    }
+
+    this.m_timeSkipMenuActive = active;
+
+    if active {
+      this.m_timeSkipMenuAutoPaused = false;
+
+      if this.HasActivePlayback()
+        && !this.m_isPaused {
+        this.m_timeSkipMenuAutoPaused =
+          this.PausePlayback(source);
+      }
+
+      if this.m_isPaused {
+        this.PrepareManualPauseForMenu(source);
+      }
+
+      return;
+    }
+
+    if this.m_timeSkipMenuAutoPaused {
+      this.m_timeSkipMenuAutoPaused = false;
+
+      if this.m_isPaused {
+        this.ResumePlayback(source);
+      }
+
+      return;
+    }
+
+    if this.m_isPaused {
+      this.ScheduleManualPauseReassertAfterMenu(
+        0.15,
+        source
+      );
+    }
+  }
+
+  public func SetPhotoModeActive(
+    active: Bool,
+    source: CName
+  ) -> Void {
+    if Equals(this.m_photoModeActive, active) {
+      return;
+    }
+
+    this.m_photoModeActive = active;
+
+    if active {
+      this.m_photoModeAutoPaused = false;
+
+      if this.HasActivePlayback()
+        && !this.m_isPaused {
+        this.m_photoModeAutoPaused =
+          this.PausePlayback(source);
+      }
+
+      if this.m_isPaused {
+        this.PrepareManualPauseForMenu(source);
+      }
+
+      return;
+    }
+
+    if this.m_photoModeAutoPaused {
+      this.m_photoModeAutoPaused = false;
+
+      if this.m_isPaused {
+        this.ResumePlayback(source);
+      }
+
+      return;
+    }
+
+    if this.m_isPaused {
+      this.ScheduleManualPauseReassertAfterMenu(
+        0.15,
+        source
+      );
+    }
+  }
+
   public func IsRadioControlRestricted() -> Bool {
     return this.m_conversationMuted;
+  }
+
+  private func IsPocketRadioAlwaysAvailableEnabled() -> Bool {
+    let settings = AWRadioFrameworkSettings.Get();
+
+    return IsDefined(settings)
+      && settings.IsPocketRadioAlwaysAvailableEnabled();
   }
 
   public func IsRepeatCurrentTrackEnabled() -> Bool {
@@ -750,6 +849,10 @@ public class AWRadioService extends ScriptableService {
   }
 
   public func IsEffectiveNativePocketRadioRestricted() -> Bool {
+    if this.IsPocketRadioAlwaysAvailableEnabled() {
+      return false;
+    }
+
     if !this.m_nativePocketRadioRestricted {
       return false;
     }
@@ -834,6 +937,32 @@ public class AWRadioService extends ScriptableService {
     );
   }
 
+  public func RefreshPocketRadioAvailability(
+    source: CName
+  ) -> Void {
+    let player = GetPlayer(GetGameInstance());
+    let pocketRadio: ref<PocketRadio>;
+
+    if !this.IsPocketRadioAlwaysAvailableEnabled()
+      && IsDefined(player) {
+      pocketRadio = player.GetPocketRadio();
+
+      if IsDefined(pocketRadio) {
+        this.m_nativePocketRadioRestricted =
+          pocketRadio.IsRestricted();
+      }
+    }
+
+    this.RefreshConversationMute(source);
+
+    AWRadioMusicDuckBridge.SetRestrictionSuspended(
+      this.IsRadioControlRestricted(),
+      source
+    );
+
+    this.RefreshCombatMusicSuppression(source);
+  }
+
   public func SyncConversationNativeAvailability(
     nativeRestricted: Bool
   ) -> Void {
@@ -889,9 +1018,13 @@ public class AWRadioService extends ScriptableService {
   private func RefreshCombatMusicSuppression(
     source: CName
   ) -> Void {
-    let shouldSuppress = this.m_preventionCombatMusicLatched
-      || (Equals(this.m_preventionHeatStage, 0)
-        && this.m_audioCombatMixActive);
+    let shouldSuppress =
+      !this.IsPocketRadioAlwaysAvailableEnabled()
+      && (
+        this.m_preventionCombatMusicLatched
+        || (Equals(this.m_preventionHeatStage, 0)
+          && this.m_audioCombatMixActive)
+      );
 
     if Equals(
       this.m_combatMusicSuppressed,
@@ -1000,10 +1133,13 @@ public class AWRadioService extends ScriptableService {
     source: CName
   ) -> Void {
     let shouldMute =
-      this.m_conversationPhoneCallRestricted
-      || this.m_conversationSceneTierRestricted
-      || this.IsEffectiveNativePocketRadioRestricted()
-      || this.m_conversationReleasePending;
+      !this.IsPocketRadioAlwaysAvailableEnabled()
+      && (
+        this.m_conversationPhoneCallRestricted
+        || this.m_conversationSceneTierRestricted
+        || this.IsEffectiveNativePocketRadioRestricted()
+        || this.m_conversationReleasePending
+      );
 
     if Equals(shouldMute, this.m_conversationMuted) {
       return;
@@ -1443,6 +1579,8 @@ public class AWRadioService extends ScriptableService {
 
   private func GetTargetVolume() -> Float {
     if this.m_isPaused
+      || this.m_timeSkipMenuActive
+      || this.m_photoModeActive
       || this.m_loadingScreenMuted
       || this.m_conversationMuted
       || this.m_combatMusicSuppressed {
@@ -1728,6 +1866,10 @@ public class AWRadioService extends ScriptableService {
     this.m_outputVolume = 0.0;
     this.m_isPaused = false;
     this.m_manualPauseGeneration += 1;
+    this.m_timeSkipMenuActive = false;
+    this.m_timeSkipMenuAutoPaused = false;
+    this.m_photoModeActive = false;
+    this.m_photoModeAutoPaused = false;
     this.m_pausedPosition = 0.0;
     this.m_playbackAnchor = 0.0;
     this.m_playbackStartedAt = 0.0;
