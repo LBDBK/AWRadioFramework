@@ -107,13 +107,13 @@ public class AWRadioTrackControlListener {
         return false;
       }
 
+      if !ListenerAction.IsButtonJustReleased(action) {
+        return false;
+      }
+
       if Equals(actionName, n"AWRadioSkipSongController") {
         actionName = n"AWRadioSkipSong";
       } else {
-        if !ListenerAction.IsButtonJustReleased(action) {
-          return false;
-        }
-
         actionName = n"AWRadioToggleRepeatSong";
       }
     } else {
