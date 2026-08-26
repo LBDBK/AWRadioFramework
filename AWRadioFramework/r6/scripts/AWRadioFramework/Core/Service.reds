@@ -130,6 +130,7 @@ public class AWRadioService extends ScriptableService {
   private let m_loadingScreenGeneration: Int32;
   private let m_loadingScreenPosition: Float;
   private let m_loadingScreenSeekPrepared: Bool;
+  private let m_fastTravelSoundDetached: Bool;
   private let m_conversationPhoneCallRestricted: Bool;
   private let m_conversationSceneTierRestricted: Bool;
   private let m_nativePocketRadioRestricted: Bool;
@@ -1150,6 +1151,53 @@ public class AWRadioService extends ScriptableService {
 
   }
 
+  public func BeginFastTravelHandoff() -> Bool {
+    let elapsed: Float;
+    let position: Float;
+    let track = this.GetCurrentTrack();
+
+    if this.m_loadingScreenMuted
+      || !this.IsPlaybackRunning()
+      || !IsDefined(track) {
+      return false;
+    }
+
+    position = this.m_currentSound.Position();
+
+    if position >= 0.0 {
+      this.m_loadingScreenPosition = ClampF(
+        position,
+        0.0,
+        track.duration
+      );
+    } else {
+      elapsed = MaxF(
+        this.GetPlaybackClock() - this.m_playbackStartedAt,
+        0.0
+      );
+
+      this.m_loadingScreenPosition = ClampF(
+        this.m_playbackAnchor + elapsed,
+        0.0,
+        track.duration
+      );
+    }
+
+    this.m_generation += 1;
+    this.m_volumeFadeGeneration += 1;
+
+    this.m_currentSound.SetVolume(0.0);
+    this.m_currentSound.Stop();
+    this.m_currentSound = null;
+    this.m_outputVolume = 0.0;
+    this.m_loadingScreenMuted = true;
+    this.m_loadingScreenSeekPrepared = false;
+    this.m_loadingScreenGeneration = this.m_generation;
+    this.m_fastTravelSoundDetached = true;
+
+    return true;
+  }
+
   public func MuteForLoadingScreen() -> Bool {
     let elapsed: Float;
     let track = this.GetCurrentTrack();
@@ -1184,12 +1232,15 @@ public class AWRadioService extends ScriptableService {
     this.m_loadingScreenMuted = true;
     this.m_loadingScreenSeekPrepared = false;
     this.m_loadingScreenGeneration = this.m_generation;
+    this.m_fastTravelSoundDetached = false;
 
     return true;
   }
 
   public func PrepareRestoreAfterLoadingScreen() -> Bool {
     let position = this.m_loadingScreenPosition;
+    let settings: ref<AudioSettingsExt>;
+    let sound: ref<DynamicSoundEvent>;
     let track = this.GetCurrentTrack();
     let shouldPrepare = this.m_loadingScreenMuted
       && !this.m_loadingScreenSeekPrepared
@@ -1197,13 +1248,44 @@ public class AWRadioService extends ScriptableService {
         this.m_generation,
         this.m_loadingScreenGeneration
       )
-      && this.HasActivePlayback()
+      && (
+        this.HasActivePlayback()
+        || this.m_fastTravelSoundDetached
+      )
       && !this.m_isPaused
       && IsDefined(track);
 
     if !shouldPrepare {
       this.ClearLoadingScreenMuteState();
       return false;
+    }
+
+    if this.m_fastTravelSoundDetached {
+      if !this.EnsureSession() {
+        this.ClearLoadingScreenMuteState();
+        return false;
+      }
+
+      settings = new AudioSettingsExt();
+      settings.volume = 0.0;
+      settings.affectedByTimeDilation = false;
+
+      sound = DynamicSoundEvent.Create(
+        track.eventName,
+        settings
+      );
+
+      if !IsDefined(sound) {
+        this.ClearLoadingScreenMuteState();
+        return false;
+      }
+
+      this.m_currentSound = sound;
+      this.m_currentEvent = track.eventName;
+      this.m_outputVolume = 0.0;
+      this.m_fastTravelSoundDetached = false;
+
+      this.m_player.QueueEvent(sound);
     }
 
     this.m_currentSound.SeekTo(
@@ -1280,6 +1362,7 @@ public class AWRadioService extends ScriptableService {
     this.m_loadingScreenSeekPrepared = false;
     this.m_loadingScreenGeneration = 0;
     this.m_loadingScreenPosition = 0.0;
+    this.m_fastTravelSoundDetached = false;
   }
 
   public func PausePlayback(
@@ -1877,5 +1960,6 @@ public class AWRadioService extends ScriptableService {
     this.m_loadingScreenGeneration = 0;
     this.m_loadingScreenPosition = 0.0;
     this.m_loadingScreenSeekPrepared = false;
+    this.m_fastTravelSoundDetached = false;
   }
 }

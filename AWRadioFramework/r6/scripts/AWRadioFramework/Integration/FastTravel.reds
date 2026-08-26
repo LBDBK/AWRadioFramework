@@ -67,10 +67,8 @@ private func FastTravel() -> Void {
     );
   }
 
-  if this.IsFastTravelEnabled()
-    && IsDefined(this.GetPlayer())
-    && IsDefined(service) {
-    service.MuteForLoadingScreen();
+  if IsDefined(service) {
+    service.BeginFastTravelHandoff();
   }
 
   wrappedMethod();
