@@ -81,21 +81,23 @@ public abstract class AWRadioTrackNotificationHelper {
 }
 
 @wrapMethod(VehicleSummonWidgetGameController)
-private final func TryShowVehicleRadioNotification() -> Void {
+private final func TryShowVehicleRadioNotification() -> Bool {
   let animationOptions: inkAnimOptions;
   let dpadAction: ref<DPADActionPerformed>;
+  let result: Bool;
   let service: ref<AWRadioService>;
   let station: ref<AWRadioStationDefinition>;
   let stationTitle: String;
   let trackTitle: String;
 
-  wrappedMethod();
+  result = wrappedMethod();
 
   service = AWRadioService.Get();
 
   if !IsDefined(service)
-    || service.GetActiveStationIndex() < 0 {
-    return;
+    || service.GetActiveStationIndex() < 0
+    || !service.ShouldShowTrackNotification() {
+    return result;
   }
 
   station = service.FindStationByIndex(
@@ -104,7 +106,7 @@ private final func TryShowVehicleRadioNotification() -> Void {
   trackTitle = service.GetCurrentTrackTitle();
 
   if !IsDefined(station) || Equals(trackTitle, "") {
-    return;
+    return result;
   }
 
   stationTitle = AWRadioTrackNotificationHelper.GetStationTitle(
@@ -112,7 +114,7 @@ private final func TryShowVehicleRadioNotification() -> Void {
   );
 
   if Equals(stationTitle, "") {
-    return;
+    return result;
   }
 
   this.PlayAnimation(
@@ -131,4 +133,6 @@ private final func TryShowVehicleRadioNotification() -> Void {
     stationTitle,
     trackTitle
   );
+
+  return result;
 }

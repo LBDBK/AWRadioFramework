@@ -220,6 +220,7 @@ public class AWRadioService extends ScriptableService {
   private let m_loadingScreenPosition: Float;
   private let m_loadingScreenSeekPrepared: Bool;
   private let m_fastTravelSoundDetached: Bool;
+  private let m_loadingRestoreScheduled: Bool;
   private let m_conversationPhoneCallRestricted: Bool;
   private let m_conversationSceneTierRestricted: Bool;
   private let m_nativePocketRadioRestricted: Bool;
@@ -239,6 +240,7 @@ public class AWRadioService extends ScriptableService {
   private let m_restrictionPhoneNoCalling: Bool;
   private let m_restrictionFastForward: Bool;
   private let m_restrictionFastForwardHintActive: Bool;
+  private let m_mountedFastForwardHintReleasePending: Bool;
   private let m_conversationReleasePending: Bool;
   private let m_conversationMuted: Bool;
   private let m_audioCombatMixActive: Bool;
@@ -710,6 +712,11 @@ public class AWRadioService extends ScriptableService {
     return this.m_isPaused;
   }
 
+  public func ShouldShowTrackNotification() -> Bool {
+    return this.IsPlaybackRunning()
+      && this.GetTargetVolume() > 0.0;
+  }
+
   public func SetGameMenuActive(
     active: Bool,
     source: CName
@@ -967,6 +974,15 @@ public class AWRadioService extends ScriptableService {
                           this.m_restrictionFastForward = restricted;
                         } else {
                           if Equals(value, 11) {
+                            if restricted {
+                              this.m_mountedFastForwardHintReleasePending = false;
+                            } else {
+                              if this.m_restrictionFastForwardHintActive
+                                && this.IsPlayerMounted() {
+                                this.m_mountedFastForwardHintReleasePending = true;
+                              }
+                            }
+
                             this.m_restrictionFastForwardHintActive = restricted;
                           }
                         }
@@ -981,10 +997,16 @@ public class AWRadioService extends ScriptableService {
       }
     }
 
+    if restricted
+      && !Equals(value, 11) {
+      this.m_mountedFastForwardHintReleasePending = false;
+    }
+
     this.RefreshConversationMute(
       n"pocket-radio-restriction-detail"
     );
   }
+
 
   public func SetAutonomousRideState(
     autodriveEnabled: Bool,
@@ -1053,12 +1075,35 @@ public class AWRadioService extends ScriptableService {
       || this.m_restrictionFastForwardHintActive;
   }
 
+  private func HasBlockingMountedRestrictionExceptFastForwardHint() -> Bool {
+    return this.m_restrictionSceneTier
+      || this.m_restrictionUpperBodyState
+      || this.m_restrictionQuestContentLock
+      || this.m_restrictionInDaClub
+      || this.m_restrictionBlockFastTravel
+      || this.m_restrictionVehicleScene
+      || this.m_restrictionVehicleBlockPocketRadio
+      || this.m_restrictionPhoneCall
+      || this.m_restrictionPhoneNoTexting
+      || this.m_restrictionPhoneNoCalling
+      || this.m_restrictionFastForward;
+  }
+
   public func IsEffectiveNativePocketRadioRestricted() -> Bool {
     if this.IsPocketRadioAlwaysAvailableEnabled() {
       return false;
     }
 
     if !this.m_nativePocketRadioRestricted {
+      return false;
+    }
+
+    if this.IsPlayerMounted()
+      && (
+        this.m_restrictionFastForwardHintActive
+        || this.m_mountedFastForwardHintReleasePending
+      )
+      && !this.HasBlockingMountedRestrictionExceptFastForwardHint() {
       return false;
     }
 
@@ -1074,6 +1119,7 @@ public class AWRadioService extends ScriptableService {
 
     return this.HasBlockingAutonomousRestriction();
   }
+
 
   public func SetPhoneCallConversationRestricted(
     restricted: Bool
@@ -1122,6 +1168,7 @@ public class AWRadioService extends ScriptableService {
   ) -> Void {
     if !restricted {
       this.m_autodriveReleasePending = false;
+      this.m_mountedFastForwardHintReleasePending = false;
     }
 
     if Equals(
@@ -1355,6 +1402,34 @@ public class AWRadioService extends ScriptableService {
 
   }
 
+  public func IsLoadingScreenRestorePending() -> Bool {
+    return this.m_loadingScreenMuted
+      && (
+        this.m_fastTravelSoundDetached
+        || this.HasActivePlayback()
+      );
+  }
+
+  public func IsGenericLoadingScreenRestorePending() -> Bool {
+    return this.m_loadingScreenMuted
+      && !this.m_fastTravelSoundDetached
+      && this.HasActivePlayback();
+  }
+
+  public func ArmLoadingScreenRestore(
+    source: CName
+  ) -> Bool {
+    if !this.IsLoadingScreenRestorePending()
+      || this.m_loadingScreenSeekPrepared
+      || this.m_loadingRestoreScheduled {
+      return false;
+    }
+
+    this.m_loadingRestoreScheduled = true;
+
+    return true;
+  }
+
   public func BeginFastTravelHandoff() -> Bool {
     let elapsed: Float;
     let position: Float;
@@ -1398,6 +1473,7 @@ public class AWRadioService extends ScriptableService {
     this.m_loadingScreenSeekPrepared = false;
     this.m_loadingScreenGeneration = this.m_generation;
     this.m_fastTravelSoundDetached = true;
+    this.m_loadingRestoreScheduled = false;
 
     return true;
   }
@@ -1424,12 +1500,11 @@ public class AWRadioService extends ScriptableService {
     );
 
     this.m_generation += 1;
-
     this.m_volumeFadeGeneration += 1;
 
     this.m_currentSound.SetVolume(
       0.0,
-      LinearTween.Immediate(0.05)
+      LinearTween.Immediate(0.0)
     );
 
     this.m_outputVolume = 0.0;
@@ -1437,6 +1512,7 @@ public class AWRadioService extends ScriptableService {
     this.m_loadingScreenSeekPrepared = false;
     this.m_loadingScreenGeneration = this.m_generation;
     this.m_fastTravelSoundDetached = false;
+    this.m_loadingRestoreScheduled = false;
 
     return true;
   }
@@ -1460,9 +1536,10 @@ public class AWRadioService extends ScriptableService {
       && IsDefined(track);
 
     if !shouldPrepare {
-      this.ClearLoadingScreenMuteState();
       return false;
     }
+
+    this.m_loadingRestoreScheduled = false;
 
     if this.m_fastTravelSoundDetached {
       if !this.EnsureSession() {
@@ -1519,7 +1596,6 @@ public class AWRadioService extends ScriptableService {
       && IsDefined(track);
 
     if !shouldRestore {
-      this.ClearLoadingScreenMuteState();
       return false;
     }
 
@@ -1567,6 +1643,7 @@ public class AWRadioService extends ScriptableService {
     this.m_loadingScreenGeneration = 0;
     this.m_loadingScreenPosition = 0.0;
     this.m_fastTravelSoundDetached = false;
+    this.m_loadingRestoreScheduled = false;
   }
 
   public func PausePlayback(
@@ -2956,6 +3033,7 @@ public class AWRadioService extends ScriptableService {
     this.m_restrictionPhoneNoCalling = false;
     this.m_restrictionFastForward = false;
     this.m_restrictionFastForwardHintActive = false;
+    this.m_mountedFastForwardHintReleasePending = false;
     this.m_conversationReleasePending = false;
     this.m_conversationMuted = false;
   }
@@ -3001,5 +3079,6 @@ public class AWRadioService extends ScriptableService {
     this.m_loadingScreenPosition = 0.0;
     this.m_loadingScreenSeekPrepared = false;
     this.m_fastTravelSoundDetached = false;
+    this.m_loadingRestoreScheduled = false;
   }
 }
