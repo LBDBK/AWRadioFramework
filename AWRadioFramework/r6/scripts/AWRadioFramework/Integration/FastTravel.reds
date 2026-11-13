@@ -79,6 +79,7 @@ protected cb func OnLoadingScreenFinished(
   value: Bool
 ) -> Bool {
   let result: Bool;
+  let service: ref<AWRadioService>;
 
   if !value {
     AWRadioLoadingBridge.MuteLateFallback();
@@ -87,7 +88,14 @@ protected cb func OnLoadingScreenFinished(
   result = wrappedMethod(value);
 
   if value {
-    AWRadioLoadingBridge.ScheduleSeekRestore();
+    service = AWRadioService.Get();
+
+    if IsDefined(service)
+      && service.ArmLoadingScreenRestore(
+        n"fast-travel-finished"
+      ) {
+      AWRadioLoadingBridge.ScheduleSeekRestore();
+    }
 
     AWRadioMusicDuckBridge.SetLoadingSuspended(
       false,

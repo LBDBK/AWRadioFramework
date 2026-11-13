@@ -31,63 +31,12 @@ public class AWNativeRadioSkipService extends ScriptableService {
   }
 
   private func GetStationNameByIndex(index: Int32) -> CName {
-    if Equals(index, 0) {
-      return n"radio_station_02_aggro_ind";
+    if index < 0
+      || index >= RadioStationDataProvider.GetStationsCount() {
+      return n"";
     }
 
-    if Equals(index, 1) {
-      return n"radio_station_03_elec_ind";
-    }
-
-    if Equals(index, 2) {
-      return n"radio_station_04_hiphop";
-    }
-
-    if Equals(index, 3) {
-      return n"radio_station_07_aggro_techno";
-    }
-
-    if Equals(index, 4) {
-      return n"radio_station_09_downtempo";
-    }
-
-    if Equals(index, 5) {
-      return n"radio_station_01_att_rock";
-    }
-
-    if Equals(index, 6) {
-      return n"radio_station_05_pop";
-    }
-
-    if Equals(index, 7) {
-      return n"radio_station_10_latino";
-    }
-
-    if Equals(index, 8) {
-      return n"radio_station_11_metal";
-    }
-
-    if Equals(index, 9) {
-      return n"radio_station_06_minim_techno";
-    }
-
-    if Equals(index, 10) {
-      return n"radio_station_08_jazz";
-    }
-
-    if Equals(index, 11) {
-      return n"radio_station_12_growl_fm";
-    }
-
-    if Equals(index, 12) {
-      return n"radio_station_13_dark_star";
-    }
-
-    if Equals(index, 13) {
-      return n"radio_station_14_impulse_fm";
-    }
-
-    return n"";
+    return RadioStationDataProvider.GetStationNameByIndex(index);
   }
 
   private func GetStationSongs(index: Int32) -> array<CName> {
@@ -343,6 +292,27 @@ public class AWNativeRadioSkipService extends ScriptableService {
       return songs;
     }
 
+    if Equals(index, 14) {
+      ArrayPush(songs, n"mus_radio_15_a_rusty_dream");
+      ArrayPush(songs, n"mus_radio_15_biji");
+      ArrayPush(songs, n"mus_radio_15_daj_mi_jeszcze_jedna_szanse");
+      ArrayPush(songs, n"mus_radio_15_high_forever");
+      ArrayPush(songs, n"mus_radio_15_in_love_with_myself");
+      ArrayPush(songs, n"mus_radio_15_no_future_no_past");
+      ArrayPush(songs, n"mus_radio_15_opening_credits");
+      ArrayPush(songs, n"mus_radio_15_overheated");
+      ArrayPush(songs, n"mus_radio_15_raising_panic");
+      ArrayPush(songs, n"mus_radio_15_run_to_the_edge");
+      ArrayPush(songs, n"mus_radio_15_serce");
+      ArrayPush(songs, n"mus_radio_15_the_descent");
+      ArrayPush(songs, n"mus_radio_15_watson");
+      ArrayPush(songs, n"mus_radio_15_welcome_back_to_nightcity");
+      ArrayPush(songs, n"mus_radio_15_worth_it");
+      ArrayPush(songs, n"mus_radio_15_you_cant_run_from_me");
+
+      return songs;
+    }
+
     return songs;
   }
 
@@ -355,7 +325,7 @@ public class AWNativeRadioSkipService extends ScriptableService {
       return -1;
     }
 
-    while index < 14 {
+    while index < RadioStationDataProvider.GetStationsCount() {
       songs = this.GetStationSongs(index);
       songIndex = 0;
 
@@ -440,7 +410,7 @@ public class AWNativeRadioSkipService extends ScriptableService {
 
       index = pocketRadio.GetStation();
 
-      if index >= 0 && index < 14 {
+      if index >= 0 && index < RadioStationDataProvider.GetStationsCount() {
         return index;
       }
 
@@ -466,7 +436,7 @@ public class AWNativeRadioSkipService extends ScriptableService {
 
     index = Cast<Int32>(vehicle.GetCurrentRadioIndex());
 
-    if index >= 0 && index < 14 {
+    if index >= 0 && index < RadioStationDataProvider.GetStationsCount() {
       return index;
     }
 
@@ -1192,6 +1162,70 @@ public class AWNativeRadioSkipService extends ScriptableService {
 
     if Equals(song, n"mus_radio_14impls_djset_pyramid_edit") {
       return "DJSET";
+    }
+
+    if Equals(song, n"mus_radio_15_a_rusty_dream") {
+      return GetLocalizedText("LocKey#99389");
+    }
+
+    if Equals(song, n"mus_radio_15_biji") {
+      return GetLocalizedText("LocKey#99180");
+    }
+
+    if Equals(song, n"mus_radio_15_daj_mi_jeszcze_jedna_szanse") {
+      return GetLocalizedText("LocKey#99185");
+    }
+
+    if Equals(song, n"mus_radio_15_high_forever") {
+      return GetLocalizedText("LocKey#99183");
+    }
+
+    if Equals(song, n"mus_radio_15_in_love_with_myself") {
+      return GetLocalizedText("LocKey#99184");
+    }
+
+    if Equals(song, n"mus_radio_15_no_future_no_past") {
+      return GetLocalizedText("LocKey#99188");
+    }
+
+    if Equals(song, n"mus_radio_15_opening_credits") {
+      return GetLocalizedText("LocKey#99190");
+    }
+
+    if Equals(song, n"mus_radio_15_overheated") {
+      return GetLocalizedText("LocKey#99191");
+    }
+
+    if Equals(song, n"mus_radio_15_raising_panic") {
+      return GetLocalizedText("LocKey#99189");
+    }
+
+    if Equals(song, n"mus_radio_15_run_to_the_edge") {
+      return GetLocalizedText("LocKey#99193");
+    }
+
+    if Equals(song, n"mus_radio_15_serce") {
+      return GetLocalizedText("LocKey#99390");
+    }
+
+    if Equals(song, n"mus_radio_15_the_descent") {
+      return GetLocalizedText("LocKey#99192");
+    }
+
+    if Equals(song, n"mus_radio_15_watson") {
+      return GetLocalizedText("LocKey#99182");
+    }
+
+    if Equals(song, n"mus_radio_15_welcome_back_to_nightcity") {
+      return GetLocalizedText("LocKey#99187");
+    }
+
+    if Equals(song, n"mus_radio_15_worth_it") {
+      return GetLocalizedText("LocKey#99181");
+    }
+
+    if Equals(song, n"mus_radio_15_you_cant_run_from_me") {
+      return GetLocalizedText("LocKey#99186");
     }
 
     return "";

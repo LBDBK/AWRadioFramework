@@ -100,6 +100,81 @@ public class AWRadioMenuPauseReassertCallback extends DelayCallback {
   }
 }
 
+public class AWRadioLiveTuneInSeekCallback extends DelayCallback {
+  private let m_service: wref<AWRadioService>;
+  private let m_generation: Int32;
+
+  public static func Create(
+    service: wref<AWRadioService>,
+    generation: Int32
+  ) -> ref<AWRadioLiveTuneInSeekCallback> {
+    let callback = new AWRadioLiveTuneInSeekCallback();
+
+    callback.m_service = service;
+    callback.m_generation = generation;
+
+    return callback;
+  }
+
+  public func Call() -> Void {
+    if IsDefined(this.m_service) {
+      this.m_service.PrepareLiveRadioTuneInSeek(
+        this.m_generation
+      );
+    }
+  }
+}
+
+public class AWRadioLiveTuneInVolumeCallback extends DelayCallback {
+  private let m_service: wref<AWRadioService>;
+  private let m_generation: Int32;
+
+  public static func Create(
+    service: wref<AWRadioService>,
+    generation: Int32
+  ) -> ref<AWRadioLiveTuneInVolumeCallback> {
+    let callback = new AWRadioLiveTuneInVolumeCallback();
+
+    callback.m_service = service;
+    callback.m_generation = generation;
+
+    return callback;
+  }
+
+  public func Call() -> Void {
+    if IsDefined(this.m_service) {
+      this.m_service.CompleteLiveRadioTuneIn(
+        this.m_generation
+      );
+    }
+  }
+}
+
+public class AWRadioLiveSessionClockCallback extends DelayCallback {
+  private let m_service: wref<AWRadioService>;
+  private let m_generation: Int32;
+
+  public static func Create(
+    service: wref<AWRadioService>,
+    generation: Int32
+  ) -> ref<AWRadioLiveSessionClockCallback> {
+    let callback = new AWRadioLiveSessionClockCallback();
+
+    callback.m_service = service;
+    callback.m_generation = generation;
+
+    return callback;
+  }
+
+  public func Call() -> Void {
+    if IsDefined(this.m_service) {
+      this.m_service.OnLiveRadioSessionClockElapsed(
+        this.m_generation
+      );
+    }
+  }
+}
+
 public class AWRadioService extends ScriptableService {
   private let m_callbackSystem: wref<CallbackSystem>;
   private let m_player: wref<PlayerPuppet>;
@@ -118,6 +193,8 @@ public class AWRadioService extends ScriptableService {
   private let m_repeatCurrentTrack: Bool;
   private let m_isPaused: Bool;
   private let m_manualPauseGeneration: Int32;
+  private let m_uiMenuActive: Bool;
+  private let m_liveRadioMenuRolloverPending: Bool;
   private let m_timeSkipMenuActive: Bool;
   private let m_timeSkipMenuAutoPaused: Bool;
   private let m_photoModeActive: Bool;
@@ -125,12 +202,25 @@ public class AWRadioService extends ScriptableService {
   private let m_pausedPosition: Float;
   private let m_playbackAnchor: Float;
   private let m_playbackStartedAt: Float;
+  private let m_liveRadioSessionStartedAt: Float;
+  private let m_liveRadioSessionClockReady: Bool;
+  private let m_liveRadioClockDelayID: DelayID;
+  private let m_liveRadioClockArmed: Bool;
+  private let m_liveRadioClockGeneration: Int32;
+  private let m_liveRadioClockBase: Float;
+  private let m_liveRadioSessionSeed: Int32;
+  private let m_liveRadioSessionSeedReady: Bool;
+  private let m_liveRadioSimulationEnabled: Bool;
+  private let m_liveRadioActiveCycle: Int32;
+  private let m_liveRadioOffsetStationIndices: array<Int32>;
+  private let m_liveRadioOffsetSeconds: array<Float>;
   private let m_sessionReady: Bool;
   private let m_loadingScreenMuted: Bool;
   private let m_loadingScreenGeneration: Int32;
   private let m_loadingScreenPosition: Float;
   private let m_loadingScreenSeekPrepared: Bool;
   private let m_fastTravelSoundDetached: Bool;
+  private let m_loadingRestoreScheduled: Bool;
   private let m_conversationPhoneCallRestricted: Bool;
   private let m_conversationSceneTierRestricted: Bool;
   private let m_nativePocketRadioRestricted: Bool;
@@ -150,6 +240,7 @@ public class AWRadioService extends ScriptableService {
   private let m_restrictionPhoneNoCalling: Bool;
   private let m_restrictionFastForward: Bool;
   private let m_restrictionFastForwardHintActive: Bool;
+  private let m_mountedFastForwardHintReleasePending: Bool;
   private let m_conversationReleasePending: Bool;
   private let m_conversationMuted: Bool;
   private let m_audioCombatMixActive: Bool;
@@ -188,14 +279,34 @@ public class AWRadioService extends ScriptableService {
   }
 
   private cb func OnSessionReady(event: ref<GameSessionEvent>) -> Void {
+    let liveSettings = AWRadioFrameworkSettings.Get();
+
     this.m_player = GetPlayer(GetGameInstance());
     this.m_sessionReady = IsDefined(this.m_player);
 
     this.ResetConversationState();
     this.ResetCombatState();
     this.ResetPlaybackState();
+    this.m_uiMenuActive = false;
+    this.m_liveRadioMenuRolloverPending = false;
     this.ResetContextPlaybackState();
     this.ResetTrackControlState();
+    this.ResetLiveRadioSessionClock();
+    this.m_liveRadioSessionSeed = 0;
+    this.m_liveRadioSessionSeedReady = false;
+    this.m_liveRadioActiveCycle = 0;
+    ArrayClear(this.m_liveRadioOffsetStationIndices);
+    ArrayClear(this.m_liveRadioOffsetSeconds);
+
+    this.m_liveRadioSimulationEnabled = IsDefined(liveSettings)
+      && liveSettings.liveRadioSimulation;
+
+    if this.m_liveRadioSimulationEnabled {
+      this.StartLiveRadioSessionClock(
+        n"session-ready"
+      );
+    }
+
     this.SyncVolumeSettings();
   }
 
@@ -205,6 +316,15 @@ public class AWRadioService extends ScriptableService {
     this.ResetCombatState();
     this.ResetTrackControlState();
 
+    this.ResetLiveRadioSessionClock();
+    this.m_liveRadioSessionSeed = 0;
+    this.m_liveRadioSessionSeedReady = false;
+    this.m_liveRadioActiveCycle = 0;
+    ArrayClear(this.m_liveRadioOffsetStationIndices);
+    ArrayClear(this.m_liveRadioOffsetSeconds);
+    this.m_liveRadioSimulationEnabled = false;
+    this.m_uiMenuActive = false;
+    this.m_liveRadioMenuRolloverPending = false;
     this.m_sessionReady = false;
     this.m_player = null;
   }
@@ -592,6 +712,93 @@ public class AWRadioService extends ScriptableService {
     return this.m_isPaused;
   }
 
+  public func ShouldShowTrackNotification() -> Bool {
+    return this.IsPlaybackRunning()
+      && this.GetTargetVolume() > 0.0;
+  }
+
+  public func SetGameMenuActive(
+    active: Bool,
+    source: CName
+  ) -> Void {
+    let position: Float;
+    let track: ref<AWRadioTrackDefinition>;
+
+    if Equals(this.m_uiMenuActive, active) {
+      return;
+    }
+
+    this.m_uiMenuActive = active;
+
+    if active {
+      if this.HasActivePlayback() {
+        if this.m_isPaused {
+          this.PrepareManualPauseForMenu(source);
+        } else {
+          this.m_volumeFadeGeneration += 1;
+          this.m_currentSound.SetVolume(
+            0.0,
+            LinearTween.Immediate(0.0)
+          );
+          this.m_outputVolume = 0.0;
+        }
+      }
+
+      return;
+    }
+
+    if this.m_liveRadioMenuRolloverPending {
+      this.m_liveRadioMenuRolloverPending = false;
+
+      if this.IsLiveRadioSimulationEnabled()
+        && IsDefined(this.m_activeStation) {
+        position = this.PrepareLiveRadioTuneIn(
+          this.m_activeStation
+        );
+
+        if position >= 0.0
+          && ArraySize(this.m_trackOrder) > 0 {
+
+          this.PlayLiveRadioTrackAtPosition(
+            position
+          );
+        }
+      }
+
+      return;
+    }
+
+    if this.HasActivePlayback()
+      && !this.m_isPaused {
+      track = this.GetCurrentTrack();
+      position = this.m_currentSound.Position();
+
+      if IsDefined(track)
+        && position >= 0.0 {
+        this.m_pausedPosition = ClampF(
+          position,
+          0.0,
+          track.duration
+        );
+        this.m_playbackAnchor = this.m_pausedPosition;
+        this.m_playbackStartedAt = this.GetPlaybackClock();
+      }
+
+      this.ApplyActiveVolumeTween(
+        source,
+        0.05
+      );
+      return;
+    }
+
+    if this.m_isPaused {
+      this.ScheduleManualPauseReassertAfterMenu(
+        0.15,
+        source
+      );
+    }
+  }
+
   public func SetTimeSkipMenuActive(
     active: Bool,
     source: CName
@@ -714,6 +921,10 @@ public class AWRadioService extends ScriptableService {
       return false;
     }
 
+    if this.IsLiveRadioSimulationEnabled() {
+      this.AdvanceLiveRadioTimelineForManualSkip();
+    }
+
     this.m_generation += 1;
 
     if !this.AdvanceToNextTrack(source) {
@@ -763,6 +974,15 @@ public class AWRadioService extends ScriptableService {
                           this.m_restrictionFastForward = restricted;
                         } else {
                           if Equals(value, 11) {
+                            if restricted {
+                              this.m_mountedFastForwardHintReleasePending = false;
+                            } else {
+                              if this.m_restrictionFastForwardHintActive
+                                && this.IsPlayerMounted() {
+                                this.m_mountedFastForwardHintReleasePending = true;
+                              }
+                            }
+
                             this.m_restrictionFastForwardHintActive = restricted;
                           }
                         }
@@ -777,10 +997,16 @@ public class AWRadioService extends ScriptableService {
       }
     }
 
+    if restricted
+      && !Equals(value, 11) {
+      this.m_mountedFastForwardHintReleasePending = false;
+    }
+
     this.RefreshConversationMute(
       n"pocket-radio-restriction-detail"
     );
   }
+
 
   public func SetAutonomousRideState(
     autodriveEnabled: Bool,
@@ -841,21 +1067,79 @@ public class AWRadioService extends ScriptableService {
       return true;
     }
 
+    return false;
+  }
+
+  private func HasBlockingMountedRestrictionExceptFastForwardHint() -> Bool {
+    return this.m_restrictionSceneTier
+      || this.m_restrictionUpperBodyState
+      || this.m_restrictionInDaClub
+      || this.m_restrictionBlockFastTravel
+      || this.m_restrictionVehicleScene
+      || this.m_restrictionVehicleBlockPocketRadio
+      || this.m_restrictionPhoneCall
+      || this.m_restrictionPhoneNoTexting
+      || this.m_restrictionPhoneNoCalling
+      || this.m_restrictionFastForward;
+  }
+
+  private func IsCurrentRideDelamain() -> Bool {
+    let autodrive = GameInstance
+      .GetScriptableSystemsContainer(GetGameInstance())
+      .Get(n"AutoDriveSystem") as AutoDriveSystem;
+
     if this.m_delamainTaxiActive {
-      return false;
+      return true;
     }
 
-    return this.m_restrictionPhoneNoCalling
-      || this.m_restrictionFastForwardHintActive;
+    return IsDefined(autodrive)
+      && autodrive.GetAutodriveEnabled()
+      && autodrive.GetAutodriveIsDelamain();
+  }
+
+  private func IsCurrentRideStandardAutodrive() -> Bool {
+    let autodrive = GameInstance
+      .GetScriptableSystemsContainer(GetGameInstance())
+      .Get(n"AutoDriveSystem") as AutoDriveSystem;
+
+    if IsDefined(autodrive) && autodrive.GetAutodriveEnabled() {
+      return !autodrive.GetAutodriveIsDelamain();
+    }
+
+    return this.m_autodriveEnabled
+      && !this.m_delamainTaxiActive;
+  }
+
+  private func HasExplicitMountedAudioRestriction() -> Bool {
+    return this.m_restrictionSceneTier
+      || this.m_restrictionInDaClub
+      || this.m_restrictionPhoneCall
+      || this.m_restrictionFastForward;
   }
 
   public func IsEffectiveNativePocketRadioRestricted() -> Bool {
-    if this.IsPocketRadioAlwaysAvailableEnabled() {
+    if this.IsPocketRadioAlwaysAvailableEnabled()
+      || !this.m_nativePocketRadioRestricted {
       return false;
     }
 
-    if !this.m_nativePocketRadioRestricted {
-      return false;
+    if this.IsPlayerMounted() && !this.IsCurrentRideDelamain() {
+      if this.IsCurrentRideStandardAutodrive() {
+        return this.HasExplicitMountedAudioRestriction();
+      }
+
+      if !this.HasAnyTrackedPocketRadioRestriction() {
+        return false;
+      }
+
+      if (
+        this.m_restrictionFastForwardHintActive
+        || this.m_mountedFastForwardHintReleasePending
+        || this.m_restrictionQuestContentLock
+      )
+        && !this.HasBlockingMountedRestrictionExceptFastForwardHint() {
+        return false;
+      }
     }
 
     if !this.m_autodriveEnabled
@@ -865,11 +1149,13 @@ public class AWRadioService extends ScriptableService {
     }
 
     if !this.HasAnyTrackedPocketRadioRestriction() {
-      return !this.m_autodriveReleasePending;
+      return this.IsCurrentRideDelamain()
+        && !this.m_autodriveReleasePending;
     }
 
     return this.HasBlockingAutonomousRestriction();
   }
+
 
   public func SetPhoneCallConversationRestricted(
     restricted: Bool
@@ -918,6 +1204,7 @@ public class AWRadioService extends ScriptableService {
   ) -> Void {
     if !restricted {
       this.m_autodriveReleasePending = false;
+      this.m_mountedFastForwardHintReleasePending = false;
     }
 
     if Equals(
@@ -1151,6 +1438,34 @@ public class AWRadioService extends ScriptableService {
 
   }
 
+  public func IsLoadingScreenRestorePending() -> Bool {
+    return this.m_loadingScreenMuted
+      && (
+        this.m_fastTravelSoundDetached
+        || this.HasActivePlayback()
+      );
+  }
+
+  public func IsGenericLoadingScreenRestorePending() -> Bool {
+    return this.m_loadingScreenMuted
+      && !this.m_fastTravelSoundDetached
+      && this.HasActivePlayback();
+  }
+
+  public func ArmLoadingScreenRestore(
+    source: CName
+  ) -> Bool {
+    if !this.IsLoadingScreenRestorePending()
+      || this.m_loadingScreenSeekPrepared
+      || this.m_loadingRestoreScheduled {
+      return false;
+    }
+
+    this.m_loadingRestoreScheduled = true;
+
+    return true;
+  }
+
   public func BeginFastTravelHandoff() -> Bool {
     let elapsed: Float;
     let position: Float;
@@ -1194,6 +1509,7 @@ public class AWRadioService extends ScriptableService {
     this.m_loadingScreenSeekPrepared = false;
     this.m_loadingScreenGeneration = this.m_generation;
     this.m_fastTravelSoundDetached = true;
+    this.m_loadingRestoreScheduled = false;
 
     return true;
   }
@@ -1220,12 +1536,11 @@ public class AWRadioService extends ScriptableService {
     );
 
     this.m_generation += 1;
-
     this.m_volumeFadeGeneration += 1;
 
     this.m_currentSound.SetVolume(
       0.0,
-      LinearTween.Immediate(0.05)
+      LinearTween.Immediate(0.0)
     );
 
     this.m_outputVolume = 0.0;
@@ -1233,6 +1548,7 @@ public class AWRadioService extends ScriptableService {
     this.m_loadingScreenSeekPrepared = false;
     this.m_loadingScreenGeneration = this.m_generation;
     this.m_fastTravelSoundDetached = false;
+    this.m_loadingRestoreScheduled = false;
 
     return true;
   }
@@ -1256,9 +1572,10 @@ public class AWRadioService extends ScriptableService {
       && IsDefined(track);
 
     if !shouldPrepare {
-      this.ClearLoadingScreenMuteState();
       return false;
     }
+
+    this.m_loadingRestoreScheduled = false;
 
     if this.m_fastTravelSoundDetached {
       if !this.EnsureSession() {
@@ -1315,7 +1632,6 @@ public class AWRadioService extends ScriptableService {
       && IsDefined(track);
 
     if !shouldRestore {
-      this.ClearLoadingScreenMuteState();
       return false;
     }
 
@@ -1363,6 +1679,7 @@ public class AWRadioService extends ScriptableService {
     this.m_loadingScreenGeneration = 0;
     this.m_loadingScreenPosition = 0.0;
     this.m_fastTravelSoundDetached = false;
+    this.m_loadingRestoreScheduled = false;
   }
 
   public func PausePlayback(
@@ -1662,6 +1979,7 @@ public class AWRadioService extends ScriptableService {
 
   private func GetTargetVolume() -> Float {
     if this.m_isPaused
+      || this.m_uiMenuActive
       || this.m_timeSkipMenuActive
       || this.m_photoModeActive
       || this.m_loadingScreenMuted
@@ -1696,6 +2014,24 @@ public class AWRadioService extends ScriptableService {
       return;
     }
 
+    if this.m_uiMenuActive
+      && this.IsLiveRadioSimulationEnabled() {
+      this.m_generation += 1;
+      this.m_volumeFadeGeneration += 1;
+
+      if IsDefined(this.m_currentSound) {
+        this.m_currentSound.SetVolume(0.0);
+        this.m_currentSound.Stop();
+      }
+
+      this.m_currentSound = null;
+      this.m_currentEvent = n"";
+      this.m_outputVolume = 0.0;
+      this.m_liveRadioMenuRolloverPending = true;
+
+      return;
+    }
+
     if this.m_repeatCurrentTrack {
       this.PlayCurrentTrack();
       return;
@@ -1716,7 +2052,19 @@ public class AWRadioService extends ScriptableService {
     this.m_trackOrderPosition += 1;
 
     if this.m_trackOrderPosition >= ArraySize(this.m_trackOrder) {
-      this.BuildShuffledTrackOrder(previousTrackIndex);
+      if this.IsLiveRadioSimulationEnabled() {
+        this.m_liveRadioActiveCycle += 1;
+
+        if !this.ApplyLiveRadioCycleOrder(
+          this.m_activeStation,
+          this.m_liveRadioActiveCycle,
+          previousTrackIndex
+        ) {
+          return false;
+        }
+      } else {
+        this.BuildShuffledTrackOrder(previousTrackIndex);
+      }
     } else {
       this.m_trackIndex = this.m_trackOrder[
         this.m_trackOrderPosition
@@ -1738,12 +2086,654 @@ public class AWRadioService extends ScriptableService {
     return this.m_sessionReady;
   }
 
+  public func SetLiveRadioSimulationEnabled(
+    enabled: Bool,
+    source: CName
+  ) -> Void {
+    let changed = NotEquals(
+      this.m_liveRadioSimulationEnabled,
+      enabled
+    );
+
+    this.m_liveRadioSimulationEnabled = enabled;
+
+    if changed {
+      this.m_liveRadioSessionSeed = 0;
+      this.m_liveRadioSessionSeedReady = false;
+      this.m_liveRadioActiveCycle = 0;
+      ArrayClear(this.m_liveRadioOffsetStationIndices);
+      ArrayClear(this.m_liveRadioOffsetSeconds);
+
+      this.ResetLiveRadioSessionClock();
+
+      if enabled && this.m_sessionReady {
+        this.StartLiveRadioSessionClock(source);
+      }
+    } else {
+      if enabled
+        && this.m_sessionReady
+        && !this.m_liveRadioSessionClockReady {
+        this.StartLiveRadioSessionClock(source);
+      }
+    }
+
+  }
+
+  private func GetLiveRadioClockSpan() -> Float {
+    return 86400.0;
+  }
+
+  private func ResetLiveRadioSessionClock() -> Void {
+    this.m_liveRadioClockGeneration += 1;
+    this.m_liveRadioClockArmed = false;
+    this.m_liveRadioClockBase = 0.0;
+    this.m_liveRadioSessionStartedAt = 0.0;
+    this.m_liveRadioSessionClockReady = false;
+  }
+
+  private func ArmLiveRadioSessionClock(
+    source: CName
+  ) -> Bool {
+    let callback: ref<AWRadioLiveSessionClockCallback>;
+    let delaySystem = GameInstance.GetDelaySystem(
+      GetGameInstance()
+    );
+    let generation: Int32;
+
+    if !IsDefined(delaySystem) {
+      return false;
+    }
+
+    this.m_liveRadioClockGeneration += 1;
+    generation = this.m_liveRadioClockGeneration;
+
+    callback = AWRadioLiveSessionClockCallback.Create(
+      this,
+      generation
+    );
+
+    this.m_liveRadioClockDelayID = delaySystem.DelayCallback(
+      callback,
+      this.GetLiveRadioClockSpan(),
+      false
+    );
+    this.m_liveRadioClockArmed = true;
+
+    return true;
+  }
+
+  private func StartLiveRadioSessionClock(
+    source: CName
+  ) -> Void {
+    this.m_liveRadioClockBase = 0.0;
+    this.m_liveRadioSessionStartedAt =
+      this.GetPlaybackClock();
+    this.m_liveRadioSessionClockReady = true;
+
+    if !this.ArmLiveRadioSessionClock(source) {
+      this.m_liveRadioClockArmed = false;
+    }
+  }
+
+  public func OnLiveRadioSessionClockElapsed(
+    generation: Int32
+  ) -> Void {
+    if NotEquals(
+        generation,
+        this.m_liveRadioClockGeneration
+      )
+      || !this.m_liveRadioClockArmed
+      || !this.m_liveRadioSimulationEnabled {
+      return;
+    }
+
+    this.m_liveRadioClockBase +=
+      this.GetLiveRadioClockSpan();
+    this.m_liveRadioClockArmed = false;
+
+    this.ArmLiveRadioSessionClock(
+      n"clock-rollover"
+    );
+  }
+
+  private func GetLiveRadioElapsed() -> Float {
+    let delaySystem = GameInstance.GetDelaySystem(
+      GetGameInstance()
+    );
+    let remaining: Float;
+
+    if this.m_liveRadioClockArmed
+      && IsDefined(delaySystem) {
+      remaining = ClampF(
+        delaySystem.GetRemainingDelayTime(
+          this.m_liveRadioClockDelayID
+        ),
+        0.0,
+        this.GetLiveRadioClockSpan()
+      );
+
+      return this.m_liveRadioClockBase
+        + this.GetLiveRadioClockSpan()
+        - remaining;
+    }
+
+    if this.m_liveRadioSessionClockReady {
+      return MaxF(
+        this.GetPlaybackClock()
+          - this.m_liveRadioSessionStartedAt,
+        0.0
+      );
+    }
+
+    return 0.0;
+  }
+
+  private func IsLiveRadioSimulationEnabled() -> Bool {
+    return this.m_liveRadioSimulationEnabled;
+  }
+
+  private func FindLiveRadioOffsetSlot(
+    stationIndex: Int32
+  ) -> Int32 {
+    let i = 0;
+
+    while i < ArraySize(
+      this.m_liveRadioOffsetStationIndices
+    ) {
+      if Equals(
+        this.m_liveRadioOffsetStationIndices[i],
+        stationIndex
+      ) {
+        return i;
+      }
+
+      i += 1;
+    }
+
+    return -1;
+  }
+
+  private func GetLiveRadioTimeOffset(
+    stationIndex: Int32
+  ) -> Float {
+    let slot = this.FindLiveRadioOffsetSlot(
+      stationIndex
+    );
+
+    if slot < 0
+      || slot >= ArraySize(
+        this.m_liveRadioOffsetSeconds
+      ) {
+      return 0.0;
+    }
+
+    return this.m_liveRadioOffsetSeconds[slot];
+  }
+
+  private func AddLiveRadioTimeOffset(
+    stationIndex: Int32,
+    seconds: Float
+  ) -> Void {
+    let slot: Int32;
+
+    if seconds <= 0.0 {
+      return;
+    }
+
+    slot = this.FindLiveRadioOffsetSlot(
+      stationIndex
+    );
+
+    if slot >= 0
+      && slot < ArraySize(
+        this.m_liveRadioOffsetSeconds
+      ) {
+      this.m_liveRadioOffsetSeconds[slot] =
+        this.m_liveRadioOffsetSeconds[slot] + seconds;
+    } else {
+      ArrayPush(
+        this.m_liveRadioOffsetStationIndices,
+        stationIndex
+      );
+      ArrayPush(
+        this.m_liveRadioOffsetSeconds,
+        seconds
+      );
+    }
+
+  }
+
+  private func AdvanceLiveRadioTimelineForManualSkip() -> Void {
+    let elapsed: Float;
+    let position: Float;
+    let remaining: Float;
+    let track = this.GetCurrentTrack();
+
+    if !IsDefined(this.m_activeStation)
+      || !IsDefined(track) {
+      return;
+    }
+
+    elapsed = MaxF(
+      this.GetPlaybackClock()
+        - this.m_playbackStartedAt,
+      0.0
+    );
+
+    position = ClampF(
+      this.m_playbackAnchor + elapsed,
+      0.0,
+      track.duration
+    );
+
+    remaining = MaxF(
+      track.duration - position,
+      0.0
+    );
+
+    this.AddLiveRadioTimeOffset(
+      this.m_activeStation.index,
+      remaining
+    );
+  }
+
+  private func ApplyLiveRadioCycleOrder(
+    station: ref<AWRadioStationDefinition>,
+    cycle: Int32,
+    previousTrackIndex: Int32
+  ) -> Bool {
+    let count: Int32;
+    let i: Int32;
+    let order: array<Int32>;
+    let temporaryIndex: Int32;
+
+    if !IsDefined(station) {
+      return false;
+    }
+
+    order = this.BuildLiveRadioTrackOrder(
+      station,
+      cycle
+    );
+    count = ArraySize(order);
+
+    if count <= 0 {
+      return false;
+    }
+
+    if count > 1
+      && previousTrackIndex >= 0
+      && Equals(order[0], previousTrackIndex) {
+      temporaryIndex = order[0];
+      order[0] = order[1];
+      order[1] = temporaryIndex;
+    }
+
+    ArrayClear(this.m_trackOrder);
+    i = 0;
+
+    while i < count {
+      ArrayPush(this.m_trackOrder, order[i]);
+      i += 1;
+    }
+
+    this.m_trackOrderPosition = 0;
+    this.m_trackIndex = order[0];
+    return true;
+  }
+
+  private func NormalizeLiveRadioIndex(
+    value: Int32,
+    count: Int32
+  ) -> Int32 {
+    let result = value;
+
+    if count <= 0 {
+      return 0;
+    }
+
+    while result >= count {
+      result -= count;
+    }
+
+    while result < 0 {
+      result += count;
+    }
+
+    return result;
+  }
+
+  private func BuildLiveRadioRawTrackOrder(
+    station: ref<AWRadioStationDefinition>,
+    cycle: Int32
+  ) -> array<Int32> {
+    let count: Int32;
+    let i: Int32;
+    let order: array<Int32>;
+    let cycleSeed: Int32;
+    let randomIndex: Int32;
+    let seed: Int32;
+    let sessionSeed: Int32;
+    let stationSeed: Int32;
+    let temporaryIndex: Int32;
+
+    if !IsDefined(station) {
+      return order;
+    }
+
+    count = ArraySize(station.tracks);
+    i = 0;
+
+    while i < count {
+      ArrayPush(order, i);
+      i += 1;
+    }
+
+    if count <= 1 {
+      return order;
+    }
+
+    sessionSeed = this.NormalizeLiveRadioIndex(
+      this.m_liveRadioSessionSeed,
+      32749
+    );
+    stationSeed = this.NormalizeLiveRadioIndex(
+      station.index,
+      32749
+    );
+    cycleSeed = this.NormalizeLiveRadioIndex(
+      cycle,
+      32749
+    );
+    seed = this.NormalizeLiveRadioIndex(
+      sessionSeed
+        + stationSeed * 7
+        + cycleSeed * 13
+        + 104729,
+      32749
+    );
+
+    i = count - 1;
+
+    while i > 0 {
+      seed = this.NormalizeLiveRadioIndex(
+        seed * 31
+          + stationSeed * 7
+          + cycleSeed * 13
+          + i * 53
+          + 7919,
+        32749
+      );
+
+      randomIndex = this.NormalizeLiveRadioIndex(
+        seed,
+        i + 1
+      );
+
+      temporaryIndex = order[i];
+      order[i] = order[randomIndex];
+      order[randomIndex] = temporaryIndex;
+      i -= 1;
+    }
+
+    return order;
+  }
+
+  private func LiveRadioOrdersEqual(
+    first: array<Int32>,
+    second: array<Int32>
+  ) -> Bool {
+    let i = 0;
+
+    if NotEquals(
+      ArraySize(first),
+      ArraySize(second)
+    ) {
+      return false;
+    }
+
+    while i < ArraySize(first) {
+      if NotEquals(first[i], second[i]) {
+        return false;
+      }
+
+      i += 1;
+    }
+
+    return true;
+  }
+
+  private func BuildLiveRadioTrackOrder(
+    station: ref<AWRadioStationDefinition>,
+    cycle: Int32
+  ) -> array<Int32> {
+    let count: Int32;
+    let order: array<Int32>;
+    let previousOrder: array<Int32>;
+    let temporaryIndex: Int32;
+
+    order = this.BuildLiveRadioRawTrackOrder(
+      station,
+      cycle
+    );
+    count = ArraySize(order);
+
+    if cycle <= 0 || count <= 2 {
+      return order;
+    }
+
+    previousOrder = this.BuildLiveRadioRawTrackOrder(
+      station,
+      cycle - 1
+    );
+
+    if this.LiveRadioOrdersEqual(
+      order,
+      previousOrder
+    ) {
+      temporaryIndex = order[0];
+      order[0] = order[1];
+      order[1] = temporaryIndex;
+    }
+
+    return order;
+  }
+
+  private func PrepareLiveRadioTuneIn(
+    station: ref<AWRadioStationDefinition>
+  ) -> Float {
+    let count: Int32;
+    let currentOrder: array<Int32>;
+    let cycle: Int32;
+    let elapsed: Float;
+    let i: Int32;
+    let initialPhase: Float;
+    let phaseSeed: Int32;
+    let previousOrder: array<Int32>;
+    let previousTrack: Int32;
+    let remaining: Float;
+    let temporaryIndex: Int32;
+    let totalDuration: Float;
+    let track: ref<AWRadioTrackDefinition>;
+    let trackIndex: Int32;
+
+    if !IsDefined(station) {
+      return -1.0;
+    }
+
+    count = ArraySize(station.tracks);
+
+    if count <= 0 {
+      return -1.0;
+    }
+
+    if !this.m_liveRadioSessionClockReady {
+      this.StartLiveRadioSessionClock(
+        n"first-tune"
+      );
+    }
+
+    if !this.m_liveRadioSessionSeedReady {
+      this.m_liveRadioSessionSeed =
+        RandRange(0, 1000000);
+      this.m_liveRadioSessionSeedReady = true;
+    }
+
+    totalDuration = 0.0;
+    i = 0;
+
+    while i < count {
+      track = station.tracks[i];
+
+      if IsDefined(track) {
+        totalDuration += track.duration;
+      }
+
+      i += 1;
+    }
+
+    if totalDuration <= 0.0 {
+      return -1.0;
+    }
+
+    elapsed = this.GetLiveRadioElapsed();
+
+    phaseSeed = this.NormalizeLiveRadioIndex(
+      this.m_liveRadioSessionSeed
+        + station.index * 97
+        + 7919,
+      10000
+    );
+
+    initialPhase = totalDuration
+      * Cast<Float>(phaseSeed)
+      / 10000.0;
+
+    elapsed = elapsed
+      + initialPhase
+      + this.GetLiveRadioTimeOffset(
+        station.index
+      );
+
+    cycle = 0;
+    remaining = elapsed;
+
+    while remaining >= totalDuration {
+      remaining -= totalDuration;
+      cycle += 1;
+    }
+
+    currentOrder = this.BuildLiveRadioTrackOrder(
+      station,
+      cycle
+    );
+
+    if Equals(ArraySize(currentOrder), 0) {
+      return -1.0;
+    }
+
+    if cycle > 0 && count > 1 {
+      previousOrder = this.BuildLiveRadioTrackOrder(
+        station,
+        cycle - 1
+      );
+
+      if Equals(ArraySize(previousOrder), count) {
+        previousTrack = previousOrder[count - 1];
+
+        if Equals(currentOrder[0], previousTrack) {
+          temporaryIndex = currentOrder[0];
+          currentOrder[0] = currentOrder[1];
+          currentOrder[1] = temporaryIndex;
+        }
+      }
+    }
+
+    ArrayClear(this.m_trackOrder);
+
+    i = 0;
+
+    while i < ArraySize(currentOrder) {
+      ArrayPush(
+        this.m_trackOrder,
+        currentOrder[i]
+      );
+      i += 1;
+    }
+
+    this.m_trackOrderPosition = 0;
+    this.m_trackIndex = currentOrder[0];
+
+    i = 0;
+
+    while i < ArraySize(currentOrder) {
+      trackIndex = currentOrder[i];
+      track = station.tracks[trackIndex];
+
+      if IsDefined(track) {
+        if remaining < track.duration {
+          this.m_trackOrderPosition = i;
+          this.m_trackIndex = trackIndex;
+
+          this.m_liveRadioActiveCycle = cycle;
+
+          return ClampF(
+            remaining,
+            0.0,
+            track.duration
+          );
+        }
+
+        remaining -= track.duration;
+      }
+
+      i += 1;
+    }
+
+    return 0.0;
+  }
+
+  private func StopForLiveRadioRetune() -> Void {
+    this.m_generation += 1;
+
+    if IsDefined(this.m_currentSound) {
+      this.m_currentSound.SetVolume(0.0);
+      this.m_currentSound.Stop();
+    }
+
+    this.ResetPlaybackState();
+  }
+
   private func StartStation(
     station: ref<AWRadioStationDefinition>
   ) -> Void {
-    this.StopInternal(false);
+    let livePosition: Float;
+
+    if this.IsLiveRadioSimulationEnabled() {
+      this.StopForLiveRadioRetune();
+    } else {
+      this.StopInternal(false);
+    }
 
     this.m_activeStation = station;
+
+    if this.IsLiveRadioSimulationEnabled() {
+      livePosition = this.PrepareLiveRadioTuneIn(
+        station
+      );
+
+      if livePosition >= 0.0
+        && ArraySize(this.m_trackOrder) > 0 {
+        this.m_generation += 1;
+
+        this.PlayLiveRadioTrackAtPosition(
+          livePosition
+        );
+
+        return;
+      }
+    }
+
     this.BuildShuffledTrackOrder(-1);
     this.m_generation += 1;
 
@@ -1851,6 +2841,167 @@ public class AWRadioService extends ScriptableService {
     this.NotifyTrackChanged();
   }
 
+  private func PlayLiveRadioTrackAtPosition(
+    startPosition: Float
+  ) -> Void {
+    let callback: ref<AWRadioTrackEndCallback>;
+    let liveSeekCallback: ref<AWRadioLiveTuneInSeekCallback>;
+    let position: Float;
+    let remaining: Float;
+    let settings: ref<AudioSettingsExt>;
+    let sound: ref<DynamicSoundEvent>;
+    let startMuted: Bool;
+    let track = this.GetCurrentTrack();
+
+    if !this.EnsureSession() || !IsDefined(track) {
+      return;
+    }
+
+    if IsDefined(this.m_currentSound) {
+      this.m_currentSound.Stop(
+        LinearTween.Immediate(0.05)
+      );
+    }
+
+    position = ClampF(
+      startPosition,
+      0.0,
+      track.duration
+    );
+    startMuted = position > 0.01;
+
+    settings = new AudioSettingsExt();
+
+    if startMuted {
+      settings.volume = 0.0;
+    } else {
+      settings.volume = this.GetTargetVolume();
+    }
+
+    settings.affectedByTimeDilation = false;
+
+    sound = DynamicSoundEvent.Create(
+      track.eventName,
+      settings
+    );
+
+    if !IsDefined(sound) {
+      return;
+    }
+
+    this.m_volumeFadeGeneration += 1;
+    this.m_currentSound = sound;
+    this.m_currentEvent = track.eventName;
+    this.m_outputVolume = settings.volume;
+    this.m_isPaused = false;
+    this.m_pausedPosition = position;
+    this.m_playbackAnchor = position;
+    this.m_playbackStartedAt = this.GetPlaybackClock();
+
+    if startMuted {
+      sound.SetVolume(0.0);
+    }
+
+    this.m_player.QueueEvent(sound);
+
+    if startMuted {
+      sound.SetVolume(0.0);
+    }
+
+    this.m_generation += 1;
+
+    remaining = MaxF(
+      track.duration - position,
+      0.10
+    );
+
+    if startMuted {
+      remaining = remaining + 0.10;
+    }
+
+    callback = AWRadioTrackEndCallback.Create(
+      this,
+      this.m_generation
+    );
+
+    GameInstance
+      .GetDelaySystem(GetGameInstance())
+      .DelayCallback(callback, remaining, false);
+
+    if startMuted {
+      liveSeekCallback =
+        AWRadioLiveTuneInSeekCallback.Create(
+          this,
+          this.m_generation
+        );
+
+      GameInstance
+        .GetDelaySystem(GetGameInstance())
+        .DelayCallback(
+          liveSeekCallback,
+          0.10,
+          false
+        );
+    }
+
+    if !startMuted {
+      this.NotifyTrackChanged();
+    }
+  }
+
+  public func PrepareLiveRadioTuneInSeek(
+    generation: Int32
+  ) -> Void {
+    let liveVolumeCallback: ref<AWRadioLiveTuneInVolumeCallback>;
+
+    if NotEquals(generation, this.m_generation)
+      || !this.HasActivePlayback()
+      || this.m_isPaused
+      || this.m_loadingScreenMuted {
+      return;
+    }
+
+    this.m_currentSound.SetVolume(0.0);
+
+    this.m_currentSound.SeekTo(
+      this.m_pausedPosition
+    );
+
+    this.m_currentSound.SetVolume(0.0);
+
+    liveVolumeCallback =
+      AWRadioLiveTuneInVolumeCallback.Create(
+        this,
+        this.m_generation
+      );
+
+    GameInstance
+      .GetDelaySystem(GetGameInstance())
+      .DelayCallback(
+        liveVolumeCallback,
+        0.25,
+        false
+      );
+  }
+
+  public func CompleteLiveRadioTuneIn(
+    generation: Int32
+  ) -> Void {
+    if NotEquals(generation, this.m_generation)
+      || !this.HasActivePlayback()
+      || this.m_isPaused
+      || this.m_loadingScreenMuted {
+      return;
+    }
+
+    this.ApplyActiveVolumeTween(
+      n"live-radio-tune-in",
+      0.05
+    );
+
+    this.NotifyTrackChanged();
+  }
+
   private func NotifyTrackChanged() -> Void {
     let event = new VehicleRadioSongChanged();
 
@@ -1918,6 +3069,7 @@ public class AWRadioService extends ScriptableService {
     this.m_restrictionPhoneNoCalling = false;
     this.m_restrictionFastForward = false;
     this.m_restrictionFastForwardHintActive = false;
+    this.m_mountedFastForwardHintReleasePending = false;
     this.m_conversationReleasePending = false;
     this.m_conversationMuted = false;
   }
@@ -1943,12 +3095,14 @@ public class AWRadioService extends ScriptableService {
     this.m_trackIndex = 0;
     ArrayClear(this.m_trackOrder);
     this.m_trackOrderPosition = 0;
+    this.m_liveRadioActiveCycle = 0;
     this.m_volumeFadeGeneration += 1;
     this.m_currentEvent = n"";
     this.m_currentSound = null;
     this.m_outputVolume = 0.0;
     this.m_isPaused = false;
     this.m_manualPauseGeneration += 1;
+    this.m_liveRadioMenuRolloverPending = false;
     this.m_timeSkipMenuActive = false;
     this.m_timeSkipMenuAutoPaused = false;
     this.m_photoModeActive = false;
@@ -1961,5 +3115,6 @@ public class AWRadioService extends ScriptableService {
     this.m_loadingScreenPosition = 0.0;
     this.m_loadingScreenSeekPrepared = false;
     this.m_fastTravelSoundDetached = false;
+    this.m_loadingRestoreScheduled = false;
   }
 }

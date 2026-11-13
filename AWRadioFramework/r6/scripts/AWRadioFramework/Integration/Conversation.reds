@@ -37,7 +37,6 @@ public func HandleRestriction(
   let isSceneTier = EnumInt(restriction)
     == EnumInt(PocketRadioRestrictions.SceneTier);
   let service = AWRadioService.Get();
-
   if restricted && IsDefined(service) {
     service.SetPocketRadioRestrictionState(
       restriction,
@@ -79,7 +78,6 @@ public func HandleRestriction(
 @wrapMethod(PocketRadio)
 public func HandleRestrictionStateChanged() -> Void {
   let service = AWRadioService.Get();
-
   wrappedMethod();
 
   AWRadioRestrictionBridge.Sync(

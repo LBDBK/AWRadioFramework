@@ -155,7 +155,7 @@ public abstract class AWRadioStationListHelper {
       return null;
     }
 
-    item = itemClass.MakeHandle();
+    item = new RadioListItemData();
 
     if !IsDefined(item) {
       return null;

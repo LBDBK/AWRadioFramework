@@ -16,6 +16,13 @@ public class AWRadioFrameworkSettings extends ScriptableSystem {
   public let pocketRadioAlwaysAvailable: Bool = false;
 
   @runtimeProperty("ModSettings.mod", "AW Radio Framework")
+  @runtimeProperty("ModSettings.category", "Global Settings")
+  @runtimeProperty("ModSettings.category.order", "1")
+  @runtimeProperty("ModSettings.displayName", "Live Radio Simulation")
+  @runtimeProperty("ModSettings.description", "When tuning to an AWRadioFramework station, joins the session-based broadcast at the track and position that would currently be playing. Inactive stations use no timers or background playback.")
+  public let liveRadioSimulation: Bool = false;
+
+  @runtimeProperty("ModSettings.mod", "AW Radio Framework")
   @runtimeProperty("ModSettings.category", "AW Radio Settings")
   @runtimeProperty("ModSettings.category.order", "2")
   @runtimeProperty("ModSettings.displayName", "Skip Song")
@@ -36,7 +43,6 @@ public class AWRadioFrameworkSettings extends ScriptableSystem {
   @runtimeProperty("ModSettings.description", "Enables fixed controller combinations: Skip Song = LB/L1 + D-Pad Right; Repeat Song = LB/L1 + D-Pad Left.")
   public let controllerGamepadBindings: Bool = false;
 
-
   public static func Get() -> ref<AWRadioFrameworkSettings> {
     return GameInstance
       .GetScriptableSystemsContainer(GetGameInstance())
@@ -53,12 +59,25 @@ public class AWRadioFrameworkSettings extends ScriptableSystem {
     return this.pocketRadioAlwaysAvailable;
   }
 
+  public func IsLiveRadioSimulationEnabled() -> Bool {
+    return this.liveRadioSimulation;
+  }
+
   public func AreControllerGamepadBindingsEnabled() -> Bool {
     return this.controllerGamepadBindings;
   }
 
   private func OnAttach() -> Void {
+    let service = AWRadioService.Get();
+
     ModSettings.RegisterListenerToClass(this);
+
+    if IsDefined(service) {
+      service.SetLiveRadioSimulationEnabled(
+        this.liveRadioSimulation,
+        n"settings-attach"
+      );
+    }
   }
 
   private func OnDetach() -> Void {
@@ -80,6 +99,12 @@ public class AWRadioFrameworkSettings extends ScriptableSystem {
       service.RefreshPocketRadioAvailability(
         n"mod-settings"
       );
+
+      service.SetLiveRadioSimulationEnabled(
+        this.liveRadioSimulation,
+        n"mod-settings"
+      );
     }
+
   }
 }

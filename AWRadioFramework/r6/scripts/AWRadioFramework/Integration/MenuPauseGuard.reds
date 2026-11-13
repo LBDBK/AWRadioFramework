@@ -37,16 +37,12 @@ public class AWRadioMenuPauseGuardSystem extends ScriptableSystem {
       return value;
     }
 
-    if value {
-      service.PrepareManualPauseForMenu(
-        n"ui-menu-open"
-      );
-    } else {
-      service.ScheduleManualPauseReassertAfterMenu(
-        0.15,
-        n"ui-menu-close"
-      );
-    }
+    service.SetGameMenuActive(
+      value,
+      value
+        ? n"ui-menu-open"
+        : n"ui-menu-close"
+    );
 
     return value;
   }

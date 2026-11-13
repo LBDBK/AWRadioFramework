@@ -22,7 +22,38 @@ public abstract class AWRadioAutonomousRideBridge {
         source
       );
     }
+  }
 
+  public static func SyncLiveState(source: CName) -> Void {
+    let blackboardSystem = GameInstance.GetBlackboardSystem(
+      GetGameInstance()
+    );
+    let blackboard: ref<IBlackboard>;
+
+    if !IsDefined(blackboardSystem) {
+      return;
+    }
+
+    blackboard = blackboardSystem.Get(
+      GetAllBlackboardDefs().UI_AutodriveData
+    );
+
+    if !IsDefined(blackboard) {
+      return;
+    }
+
+    AWRadioAutonomousRideBridge.Sync(
+      source,
+      blackboard.GetBool(
+        GetAllBlackboardDefs().UI_AutodriveData.AutoDriveEnabled
+      ),
+      blackboard.GetBool(
+        GetAllBlackboardDefs().UI_AutodriveData.CinematicCameraActive
+      ),
+      blackboard.GetBool(
+        GetAllBlackboardDefs().UI_AutodriveData.AutoDriveDelamain
+      )
+    );
   }
 }
 
@@ -69,10 +100,7 @@ protected func OnDetach(
 ) -> Void {
   wrappedMethod(stateContext, scriptInterface);
 
-  AWRadioAutonomousRideBridge.Sync(
-    n"autonomous-context-detach",
-    false,
-    false,
-    false
+  AWRadioAutonomousRideBridge.SyncLiveState(
+    n"autonomous-context-detach"
   );
 }
